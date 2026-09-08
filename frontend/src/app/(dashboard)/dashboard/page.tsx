@@ -9,13 +9,11 @@ import { AttendanceWidget } from "@/features/dashboard/components/AttendanceWidg
 import { QuickActionsWidget } from "@/components/dashboard/QuickActionsWidget";
 import { WeeklyProgressWidget } from "@/components/dashboard/WeeklyProgressWidget";
 import { StudyStreakWidget } from "@/components/dashboard/StudyStreakWidget";
-import { UpcomingEventsWidget } from "@/components/dashboard/UpcomingEventsWidget";
 import { RecentActivityWidget } from "@/components/dashboard/RecentActivityWidget";
 import { ProductivityScoreWidget } from "@/components/dashboard/ProductivityScoreWidget";
 import { FocusTimerWidget } from "@/components/dashboard/FocusTimerWidget";
 import { CampusNewsWidget } from "@/components/dashboard/CampusNewsWidget";
 import { AchievementWidget } from "@/components/dashboard/AchievementWidget";
-import { QuoteWidget } from "@/components/dashboard/QuoteWidget";
 import { OnboardingTour } from "@/components/dashboard/OnboardingTour";
 import { MonthlyCalendarWidget } from "@/components/dashboard/MonthlyCalendarWidget";
 import { Calendar as CalendarDays, CheckCircle, Clock, List as ListTodo } from "@untitledui/icons";
@@ -158,35 +156,31 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ── Row 3: Attendance  |  Study Streak ── */}
+      {/* ── Row 3: Campus News (Brought up)  |  Attendance Overview ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
+        <div id="tour-campus-news"><PopoutWidget><CampusNewsWidget /></PopoutWidget></div>
         <div id="tour-attendance"><PopoutWidget><AttendanceWidget attendance={attendance} /></PopoutWidget></div>
+      </div>
+
+      {/* ── Row 4: Study Streak  |  Focus Timer ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
         <div id="tour-streak"><StudyStreakWidget /></div>
-      </div>
-
-      {/* ── Row 4: Quick Actions  |  Weekly Progress  |  Upcoming Events ── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-start">
-        <div id="tour-quick-actions"><QuickActionsWidget /></div>
-        <div id="tour-weekly-progress"><WeeklyProgressWidget tasks={tasks} /></div>
-        <PopoutWidget><UpcomingEventsWidget /></PopoutWidget>
-      </div>
-
-      {/* ── Row 5: Recent Activity  |  Productivity Score  |  Focus Timer ── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-start">
-        <RecentActivityWidget />
-        <div id="tour-productivity"><ProductivityScoreWidget tasks={tasks} attendance={attendance} /></div>
         <div id="tour-timer"><FocusTimerWidget /></div>
       </div>
 
-      {/* ── Row 6: Campus News  |  Achievements ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-start">
-        <div id="tour-campus-news"><PopoutWidget><CampusNewsWidget /></PopoutWidget></div>
-        <div id="tour-achievements"><PopoutWidget><AchievementWidget /></PopoutWidget></div>
+      {/* ── Row 5: Quick Actions  |  Weekly Progress  |  Productivity Score ── */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-start">
+        <div id="tour-quick-actions"><QuickActionsWidget /></div>
+        <div id="tour-weekly-progress"><WeeklyProgressWidget tasks={tasks} /></div>
+        <div id="tour-productivity"><ProductivityScoreWidget tasks={tasks} attendance={attendance} /></div>
       </div>
 
-      {/* ── Row 7: Quote (full-width centered) ── */}
-      <QuoteWidget />
-      
+      {/* ── Row 6: Achievements  |  Recent Activity ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-start">
+        <div id="tour-achievements"><PopoutWidget><AchievementWidget /></PopoutWidget></div>
+        <RecentActivityWidget />
+      </div>
+
       <OnboardingTour />
     </div>
   );

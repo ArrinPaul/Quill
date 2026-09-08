@@ -7,7 +7,6 @@ import { useSidebar } from "@/hooks/useSidebar";
 import { Sidebar } from "@/components/shared/Sidebar";
 import { MobileFooter } from "@/components/shared/MobileFooter";
 import { MobileNav } from "@/components/shared/MobileNav";
-import { DashboardFooter } from "@/components/shared/DashboardFooter";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -55,8 +54,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <main className={`flex-1 overflow-auto ${!isDesktop && isDashboardRoot ? "pb-16" : ""}`}>
           <div className={isWhiteboard ? "p-4" : "p-6"}>{children}</div>
         </main>
-
-        {isDesktop && isDashboardRoot && <DashboardFooter />}
 
         {!isDesktop && isDashboardRoot && <MobileFooter onMenuClick={openMobile} />}
       </div>
