@@ -369,143 +369,157 @@ export default function TasksPage() {
 
       {/* Task Form Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
-          <div className="bg-white rounded-[12px] border border-border shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 flex flex-col">
-            <div className="flex items-center justify-between border-b border-border pb-4 mb-4">
-              <h2 className="text-lg font-bold text-foreground">
-                {isEditing ? "Edit Task" : "Create New Task"}
-              </h2>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-[24px] border border-black/5 shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto overflow-x-hidden flex flex-col relative">
+            
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 pb-4 border-b border-black/5 bg-gradient-to-r from-primary/5 to-transparent">
+              <div>
+                <h2 className="text-xl font-bold tracking-tight text-foreground">
+                  {isEditing ? "Edit Task" : "Create New Task"}
+                </h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {isEditing ? "Update your task details below." : "Add a new assignment or deadline."}
+                </p>
+              </div>
               <button 
                 onClick={() => setIsModalOpen(false)}
-                className="p-1 hover:bg-accent rounded-full text-muted-foreground hover:text-foreground transition-standard cursor-pointer"
+                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-black/5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {formError && (
-              <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-[10px] text-sm text-destructive">
-                {formError}
-              </div>
-            )}
+            <div className="p-6">
+              {formError && (
+                <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-[16px] text-sm text-destructive flex items-center gap-2 shadow-sm">
+                  <div className="w-2 h-2 rounded-full bg-destructive flex-shrink-0 animate-pulse" />
+                  {formError}
+                </div>
+              )}
 
-            <form onSubmit={handleSubmit} className="space-y-4 flex-1">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
-                  Title *
-                </label>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="w-full px-3 py-2 border border-border rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  placeholder="e.g., DBMS Assignment 2"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
+              <form onSubmit={handleSubmit} className="space-y-5">
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">
-                    Subject / Category *
+                  <label className="block text-sm font-semibold text-foreground/80 mb-2">
+                    Title <span className="text-destructive">*</span>
                   </label>
                   <input
                     type="text"
-                    value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
-                    className="w-full px-3 py-2 border border-border rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                    placeholder="e.g., DBMS"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    className="w-full px-4 py-3 bg-muted/30 border border-black/10 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all placeholder:text-muted-foreground/60 shadow-sm"
+                    placeholder="e.g., DBMS Assignment 2"
                     required
                   />
                 </div>
-                
-                {isEditing && (
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div>
-                    <label className="block text-sm font-medium text-foreground mb-1.5">
-                      Status
+                    <label className="block text-sm font-semibold text-foreground/80 mb-2">
+                      Subject / Category <span className="text-destructive">*</span>
                     </label>
-                    <select
-                      value={status}
-                      onChange={(e) => setStatus(e.target.value as TaskStatus)}
-                      className="w-full px-3 py-2 border border-border rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-white"
-                    >
-                      <option value="pending">Pending</option>
-                      <option value="completed">Completed</option>
-                      <option value="cancelled">Cancelled</option>
-                    </select>
+                    <input
+                      type="text"
+                      value={subject}
+                      onChange={(e) => setSubject(e.target.value)}
+                      className="w-full px-4 py-3 bg-muted/30 border border-black/10 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all placeholder:text-muted-foreground/60 shadow-sm"
+                      placeholder="e.g., DBMS"
+                      required
+                    />
                   </div>
-                )}
-              </div>
+                  
+                  {isEditing && (
+                    <div>
+                      <label className="block text-sm font-semibold text-foreground/80 mb-2">
+                        Status
+                      </label>
+                      <select
+                        value={status}
+                        onChange={(e) => setStatus(e.target.value as TaskStatus)}
+                        className="w-full px-4 py-3 bg-muted/30 border border-black/10 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all cursor-pointer shadow-sm appearance-none"
+                        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1em' }}
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="completed">Completed</option>
+                        <option value="cancelled">Cancelled</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
-                  Description
-                </label>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="w-full h-24 px-3 py-2 border border-border rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none"
-                  placeholder="Additional assignment details, submission link, etc."
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">
-                    Deadline *
+                  <label className="block text-sm font-semibold text-foreground/80 mb-2">
+                    Description
                   </label>
-                  <input
-                    type="datetime-local"
-                    value={deadline}
-                    onChange={(e) => setDeadline(e.target.value)}
-                    className="w-full px-3 py-2 border border-border rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                    required
+                  <textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className="w-full h-28 px-4 py-3 bg-muted/30 border border-black/10 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all resize-none placeholder:text-muted-foreground/60 shadow-sm scrollbar-thin"
+                    placeholder="Additional assignment details, submission link, etc."
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">
-                    Telegram Reminder Time
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={reminderTime}
-                    onChange={(e) => setReminderTime(e.target.value)}
-                    className="w-full px-3 py-2 border border-border rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-sm font-semibold text-foreground/80 mb-2">
+                      Deadline <span className="text-destructive">*</span>
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={deadline}
+                      onChange={(e) => setDeadline(e.target.value)}
+                      className="w-full px-4 py-3 bg-muted/30 border border-black/10 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all shadow-sm"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-foreground/80 mb-2 flex items-center gap-2">
+                      Telegram Reminder
+                      <Bell className="w-3.5 h-3.5 text-secondary" />
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={reminderTime}
+                      onChange={(e) => setReminderTime(e.target.value)}
+                      className="w-full px-4 py-3 bg-muted/30 border border-black/10 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all shadow-sm"
+                    />
+                  </div>
                 </div>
-              </div>
 
-              <div className="flex items-center gap-2 pt-2">
-                <input
-                  id="add-to-calendar"
-                  type="checkbox"
-                  checked={addToCalendar}
-                  onChange={(e) => setAddToCalendar(e.target.checked)}
-                  className="w-4 h-4 rounded text-primary focus:ring-primary"
-                />
-                <label htmlFor="add-to-calendar" className="text-sm font-medium text-foreground cursor-pointer">
-                  Sync with Google Calendar & trigger Telegram automations
-                </label>
-              </div>
+                <div className="flex items-start gap-3 pt-3">
+                  <div className="flex items-center h-5 mt-0.5">
+                    <input
+                      id="add-to-calendar"
+                      type="checkbox"
+                      checked={addToCalendar}
+                      onChange={(e) => setAddToCalendar(e.target.checked)}
+                      className="w-4.5 h-4.5 rounded border-black/20 text-primary focus:ring-primary/20 transition-all cursor-pointer"
+                    />
+                  </div>
+                  <label htmlFor="add-to-calendar" className="text-sm font-medium text-foreground/80 cursor-pointer select-none leading-snug">
+                    Sync with <span className="text-blue-600 font-semibold">Google Calendar</span> & trigger Telegram automations
+                  </label>
+                </div>
 
-              <div className="flex gap-3 justify-end border-t border-border pt-4 mt-6">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 border border-border text-foreground font-medium rounded-[10px] hover:bg-accent transition-standard cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground font-medium rounded-[10px] hover:opacity-90 transition-standard cursor-pointer disabled:opacity-50"
-                >
-                  {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {isEditing ? "Save Changes" : "Create Task"}
-                </button>
-              </div>
-            </form>
+                <div className="flex gap-3 justify-end pt-6 mt-6 border-t border-black/5">
+                  <button
+                    type="button"
+                    onClick={() => setIsModalOpen(false)}
+                    className="px-5 py-2.5 bg-white border border-black/10 text-foreground font-semibold rounded-[12px] hover:bg-accent hover:border-black/20 transition-all cursor-pointer shadow-sm"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-primary to-primary/90 text-primary-foreground font-semibold rounded-[12px] hover:shadow-lg hover:-translate-y-0.5 transition-all cursor-pointer disabled:opacity-50 disabled:hover:translate-y-0 disabled:shadow-none shadow-md"
+                  >
+                    {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                    {isEditing ? "Save Changes" : "Create Task"}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}

@@ -180,57 +180,60 @@ export default function AttendancePage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0 overflow-y-auto pb-6 pr-1">
         {/* Attendance Form */}
-        <div className="bg-white border border-border rounded-[10px] p-5 shadow-sm h-fit">
-          <h3 className="font-semibold text-foreground text-base mb-4 flex items-center gap-2">
-            <Plus className="w-4 h-4 text-primary" />
+        <div className="bg-white/60 backdrop-blur-xl border border-white/40 rounded-[24px] p-6 shadow-sm h-fit relative overflow-hidden">
+          <div className="absolute top-[-20%] left-[-20%] w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+          <h3 className="font-bold text-foreground text-lg mb-5 flex items-center gap-2 relative z-10">
+            <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+              <Plus className="w-4 h-4" />
+            </div>
             Add / Update Subject
           </h3>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-5 relative z-10">
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">
-                Subject Name *
+              <label className="block text-sm font-semibold text-foreground/80 mb-2">
+                Subject Name <span className="text-destructive">*</span>
               </label>
               <input
                 type="text"
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
-                className="w-full px-3 py-2 border border-border rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                className="w-full px-4 py-3 bg-white/80 border border-black/5 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all placeholder:text-muted-foreground/60 shadow-sm"
                 placeholder="e.g., OS, DBMS, Networks"
                 required
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
-                  Total Classes *
+                <label className="block text-sm font-semibold text-foreground/80 mb-2">
+                  Total Classes <span className="text-destructive">*</span>
                 </label>
                 <input
                   type="number"
                   min="0"
                   value={totalClasses}
                   onChange={(e) => setTotalClasses(e.target.value === "" ? "" : Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-border rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="w-full px-4 py-3 bg-white/80 border border-black/5 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all shadow-sm"
                   placeholder="0"
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
-                  Attended *
+                <label className="block text-sm font-semibold text-foreground/80 mb-2">
+                  Attended <span className="text-destructive">*</span>
                 </label>
                 <input
                   type="number"
                   min="0"
                   value={attendedClasses}
                   onChange={(e) => setAttendedClasses(e.target.value === "" ? "" : Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-border rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="w-full px-4 py-3 bg-white/80 border border-black/5 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all shadow-sm"
                   placeholder="0"
                   required
                 />
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">
+              <label className="block text-sm font-semibold text-foreground/80 mb-2">
                 Required Attendance Threshold (%)
               </label>
               <input
@@ -239,39 +242,43 @@ export default function AttendancePage() {
                 max="100"
                 value={threshold}
                 onChange={(e) => setThreshold(Number(e.target.value))}
-                className="w-full px-3 py-2 border border-border rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                className="w-full px-4 py-3 bg-white/80 border border-black/5 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all shadow-sm"
                 placeholder="75"
               />
             </div>
 
-            <button
-              type="submit"
-              disabled={submitting}
-              className="inline-flex w-full items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground font-medium rounded-[10px] hover:opacity-90 transition-standard cursor-pointer disabled:opacity-50"
-            >
-              {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-              Save Attendance
-            </button>
+            <div className="pt-2">
+              <button
+                type="submit"
+                disabled={submitting}
+                className="inline-flex w-full items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-primary to-primary/90 text-primary-foreground font-semibold rounded-[14px] hover:shadow-lg hover:-translate-y-0.5 transition-all cursor-pointer disabled:opacity-50 disabled:hover:translate-y-0 shadow-md"
+              >
+                {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                Save Attendance
+              </button>
+            </div>
           </form>
         </div>
 
         {/* Attendance Records List */}
-        <div className="lg:col-span-2 space-y-4">
+        <div className="lg:col-span-2 space-y-5">
           {loading ? (
-            <div className="flex flex-col items-center justify-center py-20 bg-white border border-border rounded-[10px]">
-              <Loader2 className="w-8 h-8 text-primary animate-spin mb-2" />
-              <p className="text-sm text-muted-foreground">Loading attendance...</p>
+            <div className="flex flex-col items-center justify-center py-24 bg-white/60 backdrop-blur-xl border border-white/40 rounded-[24px]">
+              <Loader2 className="w-8 h-8 text-primary animate-spin mb-3" />
+              <p className="text-sm font-medium text-muted-foreground">Loading attendance...</p>
             </div>
           ) : records.length === 0 ? (
-            <div className="bg-white border border-border rounded-[10px] p-12 text-center shadow-sm">
-              <BarChart3 className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-foreground mb-2">No attendance records</h3>
-              <p className="text-sm text-muted-foreground mb-4">
+            <div className="bg-white/60 backdrop-blur-xl border border-white/40 rounded-[24px] p-16 text-center shadow-sm flex flex-col items-center justify-center h-full min-h-[400px]">
+              <div className="w-16 h-16 rounded-full bg-black/5 flex items-center justify-center mb-5">
+                <BarChart3 className="w-8 h-8 text-muted-foreground/60" />
+              </div>
+              <h3 className="text-xl font-bold text-foreground mb-2">No attendance records</h3>
+              <p className="text-sm text-muted-foreground mb-4 max-w-sm">
                 Add your classes to assess your current percentages and skip-class budgets!
               </p>
             </div>
           ) : (
-            <div className="grid gap-4">
+            <div className="grid gap-5">
               {records.map((record) => {
                 const percentage = record.total_classes > 0 
                   ? ((record.attended_classes / record.total_classes) * 100).toFixed(1)
@@ -282,50 +289,52 @@ export default function AttendancePage() {
                 return (
                   <div
                     key={record.id}
-                    className={`bg-white border rounded-[10px] p-5 shadow-sm flex items-start justify-between gap-4 transition-all hover:shadow-md ${
-                      isUnderThreshold ? "border-destructive/30" : "border-border"
+                    className={`bg-gradient-to-br from-white/90 to-white/50 backdrop-blur-xl border rounded-[20px] p-6 shadow-sm flex flex-col sm:flex-row items-start justify-between gap-5 transition-all hover:shadow-md hover:-translate-y-0.5 ${
+                      isUnderThreshold ? "border-destructive/20" : "border-white/40"
                     }`}
                   >
-                    <div className="space-y-2 flex-1">
-                      <div className="flex items-center gap-3">
-                        <h4 className="font-bold text-foreground text-lg">{record.subject}</h4>
-                        <span className={`inline-block px-2 py-0.5 text-xs font-semibold rounded-[10px] ${
+                    <div className="space-y-4 flex-1 w-full">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <h4 className="font-bold text-foreground text-xl">{record.subject}</h4>
+                        <span className={`inline-block px-3 py-1 text-xs font-bold rounded-full ${
                           isUnderThreshold 
                             ? "bg-destructive/15 text-destructive" 
-                            : "bg-green-500/15 text-green-600"
+                            : "bg-green-500/15 text-green-700"
                         }`}>
                           {percentage}%
                         </span>
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-xs font-medium text-muted-foreground bg-black/5 px-2.5 py-1 rounded-full">
                           Goal: {record.threshold}%
                         </span>
                       </div>
 
-                      <div className="w-full bg-muted rounded-full h-2">
-                        <div
-                          className={`h-2 rounded-full transition-all duration-500 ${
-                            isUnderThreshold ? "bg-destructive" : "bg-green-500"
-                          }`}
-                          style={{ width: `${Math.min(Number(percentage), 100)}%` }}
-                        />
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between items-center text-xs font-medium text-foreground/70">
+                          <span>Progress</span>
+                          <span>
+                            <strong>{record.attended_classes}</strong> / {record.total_classes} classes
+                          </span>
+                        </div>
+                        <div className="w-full bg-black/5 rounded-full h-2.5 overflow-hidden border border-black/5">
+                          <div
+                            className={`h-full rounded-full transition-all duration-700 ease-out ${
+                              isUnderThreshold ? "bg-gradient-to-r from-destructive to-destructive/70" : "bg-gradient-to-r from-green-500 to-green-400"
+                            }`}
+                            style={{ width: `${Math.min(Number(percentage), 100)}%` }}
+                          />
+                        </div>
                       </div>
 
-                      <div className="flex justify-between items-center text-xs text-muted-foreground">
-                        <span>
-                          Attended: <strong>{record.attended_classes}</strong> / <strong>{record.total_classes}</strong> classes
-                        </span>
-                      </div>
-
-                      <div className="flex gap-2 mt-2">
+                      <div className="flex flex-wrap gap-2.5 pt-1">
                         <button
                           onClick={() => handleQuickUpdate(record, "attended")}
-                          className="text-xs px-3 py-1.5 rounded-md font-medium bg-green-500/10 text-green-600 hover:bg-green-500/20 transition-standard cursor-pointer"
+                          className="text-xs px-4 py-2 rounded-[10px] font-bold bg-green-500/10 text-green-700 hover:bg-green-500/20 hover:scale-105 transition-all cursor-pointer border border-green-500/10"
                         >
                           + Attended
                         </button>
                         <button
                           onClick={() => handleQuickUpdate(record, "missed")}
-                          className="text-xs px-3 py-1.5 rounded-md font-medium bg-destructive/10 text-destructive hover:bg-destructive/20 transition-standard cursor-pointer"
+                          className="text-xs px-4 py-2 rounded-[10px] font-bold bg-destructive/10 text-destructive hover:bg-destructive/20 hover:scale-105 transition-all cursor-pointer border border-destructive/10"
                         >
                           + Missed
                         </button>
@@ -333,44 +342,46 @@ export default function AttendancePage() {
 
                       {/* AI Risk Alerter Message box */}
                       {aiAlert ? (
-                        <div className={`mt-3 p-3 text-xs rounded-[8px] flex items-start gap-2 border leading-relaxed ${
+                        <div className={`mt-4 p-4 text-sm rounded-[14px] flex items-start gap-3 border leading-relaxed shadow-sm ${
                           aiAlert.isAtRisk 
                             ? "bg-destructive/5 border-destructive/10 text-destructive" 
-                            : "bg-green-500/5 border-green-500/10 text-green-600"
+                            : "bg-green-500/5 border-green-500/10 text-green-700"
                         }`}>
-                          {aiAlert.isAtRisk ? (
-                            <ShieldAlert className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                          ) : (
-                            <CheckCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                          )}
+                          <div className={`mt-0.5 p-1 rounded-full ${aiAlert.isAtRisk ? "bg-destructive/10" : "bg-green-500/10"}`}>
+                            {aiAlert.isAtRisk ? (
+                              <ShieldAlert className="w-4 h-4 flex-shrink-0" />
+                            ) : (
+                              <CheckCircle className="w-4 h-4 flex-shrink-0" />
+                            )}
+                          </div>
                           <div>
-                            <span className="font-semibold block mb-0.5 flex items-center gap-1">
+                            <span className="font-bold block mb-1 flex items-center gap-1.5 uppercase tracking-wider text-[10px] opacity-80">
                               <Sparkles className="w-3 h-3 text-current animate-pulse" />
                               AI Risk Assessment
                             </span>
-                            {aiAlert.message}
+                            <span className="font-medium">{aiAlert.message}</span>
                           </div>
                         </div>
                       ) : (
-                        <div className="h-10 bg-muted/40 animate-pulse rounded-[8px] mt-3" />
+                        <div className="h-16 bg-muted/40 animate-pulse rounded-[14px] mt-4" />
                       )}
                     </div>
 
-                    <div className="flex flex-col items-center justify-start gap-2 flex-shrink-0">
+                    <div className="flex sm:flex-col items-center justify-start gap-2 flex-shrink-0 w-full sm:w-auto mt-2 sm:mt-0 border-t sm:border-t-0 sm:border-l border-black/5 pt-3 sm:pt-0 sm:pl-3">
                       <button
                         onClick={() => handleRefreshAlert(record)}
                         disabled={analyzingId === record.id}
-                        className="p-1.5 hover:bg-accent rounded-[10px] text-muted-foreground hover:text-foreground transition-standard cursor-pointer"
+                        className="p-2 w-full sm:w-auto hover:bg-black/5 rounded-[12px] text-muted-foreground hover:text-foreground transition-all cursor-pointer flex items-center justify-center"
                         title="Recheck risk assessment"
                       >
-                        <RefreshCw className={`w-4 h-4 ${analyzingId === record.id ? "animate-spin" : ""}`} />
+                        <RefreshCw className={`w-4.5 h-4.5 ${analyzingId === record.id ? "animate-spin" : ""}`} />
                       </button>
                       <button
                         onClick={() => handleDelete(record.id)}
-                        className="p-1.5 hover:bg-destructive/10 rounded-[10px] text-muted-foreground hover:text-destructive transition-standard cursor-pointer"
+                        className="p-2 w-full sm:w-auto hover:bg-destructive/10 rounded-[12px] text-muted-foreground hover:text-destructive transition-all cursor-pointer flex items-center justify-center"
                         title="Delete subject record"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-4.5 h-4.5" />
                       </button>
                     </div>
                   </div>
