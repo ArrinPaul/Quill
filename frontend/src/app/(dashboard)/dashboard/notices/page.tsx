@@ -153,9 +153,9 @@ export default function NoticesPage() {
 
   return (
     <div className="max-w-7xl mx-auto h-[calc(100vh-6rem)] flex flex-col">
-      <div className="flex items-center justify-between flex-shrink-0 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 flex-shrink-0 mb-6">
         <h1 className="text-2xl font-bold text-foreground">Announcements</h1>
-        <div className="flex bg-muted/40 p-1 rounded-[10px] w-full max-w-sm">
+        <div className="flex bg-muted/40 p-1 rounded-[10px] w-full sm:max-w-sm">
           <button 
             onClick={() => setViewMode("group")} 
             className={`flex-1 text-sm font-medium py-1.5 rounded-[8px] transition-standard flex items-center justify-center gap-2 ${viewMode === "group" ? "bg-white shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}

@@ -9,17 +9,12 @@ const noticeRoutes = require("./routes/notices");
 const attendanceRoutes = require("./routes/attendance");
 const aiRoutes = require("./routes/ai");
 const quizRoutes = require("./routes/quizzes");
-const automationRoutes = require("./routes/automations");
 const googleRoutes = require("./routes/google");
 const whiteboardRoutes = require("./routes/whiteboards");
-const groupRoutes = require("./routes/groups");
 const calendarRoutes = require("./routes/calendar");
-const reminderRoutes = require("./routes/reminders");
 const flashcardsRoutes = require("./routes/flashcards");
-const telegramRoutes = require("./routes/telegram");
 const achievementsRoutes = require("./routes/achievements");
 const activityRoutes = require("./routes/activity");
-const { initCronJobs } = require("./services/cron");
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -33,14 +28,10 @@ app.use("/api/notices", noticeRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/quizzes", quizRoutes);
-app.use("/api/automations", automationRoutes);
 app.use("/api/auth/google", googleRoutes);
 app.use("/api/whiteboards", whiteboardRoutes);
-app.use("/api/groups", groupRoutes);
 app.use("/api/calendar", calendarRoutes);
-app.use("/api/reminders", reminderRoutes);
 app.use("/api/flashcards", flashcardsRoutes);
-app.use("/api/telegram", telegramRoutes);
 app.use("/api/achievements", achievementsRoutes);
 app.use("/api/activity", activityRoutes);
 
@@ -48,9 +39,6 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
-// Initialize background jobs
-initCronJobs();
-
 app.listen(PORT, () => {
-  console.log(`CampusFlow backend running on port ${PORT}`);
+  console.log(`Quill backend running on port ${PORT}`);
 });

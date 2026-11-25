@@ -1,9 +1,6 @@
 const express = require("express");
 const { getClient } = require("../services/supabase");
 const authMiddleware = require("../middleware/auth");
-const { triggerN8nDeadline } = require("../services/n8n");
-const { getValidAccessToken, createCalendarEvent } = require("../services/google");
-const { getStudentTelegram } = require("../services/telegram");
 
 const router = express.Router();
 
@@ -93,14 +90,6 @@ router.post("/", async (req, res) => {
 
     if (error) throw error;
 
-    const { data: student } = await getClient()
-      .from("students")
-      .select("name, telegram_username")
-      .eq("id", req.student.id)
-      .single();
-
-
-
     res.json({ task });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -114,7 +103,6 @@ router.put("/:id", async (req, res) => {
     const updatePayload = { title, subject, description, deadline, status };
     if (reminder_time !== undefined) {
       updatePayload.reminder_time = reminder_time;
-      updatePayload.n8n_triggered = false; // Reset so new reminder fires
     }
 
     const { data: task, error } = await getClient()

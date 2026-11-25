@@ -141,7 +141,7 @@ export default function AttendancePage() {
     );
 
     try {
-      await api.post<{ attendance: Attendance }>("/api/attendance", {
+      const res = await api.post<{ attendance: Attendance }>("/api/attendance", {
         subject: record.subject,
         total_classes: newTotal,
         attended_classes: newAttended,
@@ -150,15 +150,19 @@ export default function AttendancePage() {
       
       handleRefreshAlert(updatedRecord);
     } catch (err) {
-      console.error("Failed to update attendance", err);
+      setRecords((prev) => prev.map((r) => (r.id === record.id ? record : r)));
+      setFormError(err instanceof Error ? err.message : "Failed to update attendance");
     }
   };
 
   return (
-    <div className="max-w-7xl mx-auto h-[calc(100vh-6rem)] flex flex-col">
+    <div className="max-w-7xl mx-auto min-h-[calc(100vh-6rem)] flex flex-col">
       <div className="flex items-center justify-between flex-shrink-0 mb-6">
         <h1 className="text-2xl font-bold text-foreground">Attendance Tracker</h1>
         <button 
+          type="button"
+          aria-label="Refresh attendance"
+          title="Refresh attendance"
           onClick={() => fetchAttendance(false)}
           className="p-1.5 hover:bg-accent rounded-[10px] text-muted-foreground hover:text-foreground transition-standard cursor-pointer"
         >
@@ -167,7 +171,7 @@ export default function AttendancePage() {
       </div>
 
       {formError && (
-        <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-[10px] text-sm text-destructive animate-in fade-in duration-200">
+        <div role="alert" className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-[10px] text-sm text-destructive animate-in fade-in duration-200">
           {formError}
         </div>
       )}

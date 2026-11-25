@@ -64,11 +64,11 @@ export function WeeklyProgressWidget({ tasks = [] }: WeeklyProgressWidgetProps) 
               <div key={day.label} className="flex-1 flex flex-col items-center gap-1">
                 <div className="w-full flex flex-col justify-end" style={{ height: "100%" }}>
                   <div
-                    className={`w-full ${totalH - completedH === 0 ? 'rounded-t-[4px] rounded-b-[4px]' : 'rounded-b-[4px]'} bg-primary animate-progress-fill transition-all`}
+                    className={`w-full ${totalH - completedH === 0 ? 'rounded-[4px]' : 'rounded-t-[4px]'} bg-primary animate-progress-fill transition-all`}
                     style={{ height: `${completedH}%`, minHeight: completedH > 0 ? '4px' : '0', animationDelay: `${i * 0.08}s` }}
                   />
                   <div
-                    className={`w-full ${completedH === 0 ? 'rounded-t-[4px] rounded-b-[4px]' : 'rounded-t-[4px]'} bg-muted transition-all`}
+                    className={`w-full ${completedH === 0 ? 'rounded-[4px]' : 'rounded-b-[4px]'} bg-muted transition-all`}
                     style={{ height: `${totalH - completedH}%`, minHeight: (totalH - completedH) > 0 ? '4px' : '0' }}
                   />
                 </div>

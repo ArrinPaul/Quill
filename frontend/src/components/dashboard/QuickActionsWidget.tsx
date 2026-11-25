@@ -5,10 +5,10 @@ import { Announcement01 as Megaphone, BarChart01 as BarChart3, FaceSmile as Bot,
 
 const actions = [
   { icon: Plus, label: "Add Task", href: "/dashboard/tasks", color: "bg-primary text-white" },
-  { icon: Megaphone, label: "Add Notice", href: "/dashboard/notices", color: "bg-primary/80 text-white" },
-  { icon: BarChart3, label: "Attendance", href: "/dashboard/attendance", color: "bg-primary/60 text-white" },
-  { icon: Bot, label: "AI Assistant", href: "/dashboard/ai", color: "bg-primary/40 text-white" },
-  { icon: Settings, label: "Settings", href: "/dashboard/settings", color: "bg-muted text-muted-foreground" },
+  { icon: Megaphone, label: "Add Notice", href: "/dashboard/notices", color: "bg-primary/90 text-white" },
+  { icon: BarChart3, label: "Attendance", href: "/dashboard/attendance", color: "bg-primary/85 text-white" },
+  { icon: Bot, label: "AI Assistant", href: "/dashboard/ai", color: "bg-primary/80 text-white" },
+  { icon: Settings, label: "Settings", href: "/dashboard/settings", color: "bg-muted text-foreground" },
 ];
 
 export function QuickActionsWidget() {

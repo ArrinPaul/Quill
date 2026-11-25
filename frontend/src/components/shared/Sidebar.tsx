@@ -2,16 +2,18 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Announcement01 as Megaphone, BarChart01 as BarChart3, ChevronLeftDouble as ChevronsLeft, ChevronRightDouble as ChevronsRight, FaceSmile as Bot, GitBranch01 as Workflow, GraduationHat01 as GraduationCap, HelpCircle, LayersTwo01 as Layers, LayoutGrid01 as LayoutDashboard, List as ListTodo, LogOut01 as LogOut, PenTool01 as PenTool, Settings01 as Settings, Stars01 as Sparkles } from "@untitledui/icons";
+import { Announcement01 as Megaphone, BarChart01 as BarChart3, ChevronLeftDouble as ChevronsLeft, ChevronRightDouble as ChevronsRight, FaceSmile as Bot, GraduationHat01 as GraduationCap, HelpCircle, LayersTwo01 as Layers, LayoutGrid01 as LayoutDashboard, List as ListTodo, LogOut01 as LogOut, PenTool01 as PenTool, Settings01 as Settings, Stars01 as Sparkles } from "@untitledui/icons";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 
 interface SidebarProps {
   isCollapsed: boolean;
   onToggle: () => void;
+  onNavigate?: () => void;
+  hideCollapseButton?: boolean;
 }
 
-export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
+export function Sidebar({ isCollapsed, onToggle, onNavigate, hideCollapseButton = false }: SidebarProps) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
 
@@ -31,7 +33,6 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
   ];
 
   const systemItems = [
-    { href: "/dashboard/automations", icon: Workflow, label: "Automations" },
     { href: "/dashboard/settings", icon: Settings, label: "Settings" },
   ];
 
@@ -49,13 +50,15 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
       )}
     >
       <div className={cn("flex items-center h-16 border-b border-white/10 px-4", isCollapsed ? "justify-center" : "justify-between")}>
-        <Link href="/dashboard" className="flex items-center gap-2.5 group" title="UniKit Dashboard">
-          <img src="/logo-ukit.png" alt="UniKit Logo" className="w-8 h-8 object-contain transition-transform group-hover:scale-105" />
-          {!isCollapsed && <span className="text-base font-bold text-white tracking-tight">UniKit</span>}
+        <Link href="/dashboard" className="flex items-center gap-2.5 group" title="Quill Dashboard">
+          <img src="/logo-quill.png" alt="Quill Logo" className="w-8 h-8 object-contain transition-transform group-hover:scale-105" />
+          {!isCollapsed && <span className="text-base font-bold text-white tracking-tight">Quill</span>}
         </Link>
-        {!isCollapsed && (
+        {!isCollapsed && !hideCollapseButton && (
           <button
+            type="button"
             onClick={onToggle}
+            aria-label="Collapse sidebar"
             title="Collapse sidebar"
             className="p-1.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
           >
@@ -69,6 +72,7 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
           <Link
             key={item.href}
             href={item.href}
+            onClick={onNavigate}
             id={`tour-nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
             title={isCollapsed ? item.label : undefined}
             className={cn(
@@ -96,6 +100,7 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
           <Link
             key={item.href}
             href={item.href}
+            onClick={onNavigate}
             id={`tour-nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
             title={isCollapsed ? item.label : undefined}
             className={cn(
@@ -123,6 +128,7 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
           <Link
             key={item.href}
             href={item.href}
+            onClick={onNavigate}
             title={isCollapsed ? item.label : undefined}
             className={cn(
               "flex items-center gap-3 py-2 rounded-[10px] text-sm font-medium transition-all duration-150",
@@ -158,7 +164,9 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
         )}
 
         <button
+          type="button"
           onClick={logout}
+          aria-label="Logout"
           title={isCollapsed ? "Logout" : undefined}
           className={cn(
             "flex items-center gap-3 w-full py-2 rounded-[10px] text-sm font-medium transition-all duration-150 text-white/70 hover:bg-white/10 hover:text-white",
@@ -169,23 +177,27 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
           {!isCollapsed && <span>Logout</span>}
         </button>
 
-        <button
-          onClick={onToggle}
-          title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-          className={cn(
-            "flex items-center gap-3 w-full py-2 rounded-[10px] text-sm font-medium transition-all duration-150 text-white/70 hover:bg-white/10 hover:text-white",
-            isCollapsed ? "justify-center px-0" : "px-3"
-          )}
-        >
-          {isCollapsed ? (
-            <ChevronsRight className="w-4.5 h-4.5" />
-          ) : (
-            <>
-              <ChevronsLeft className="w-4.5 h-4.5" />
-              <span>Collapse</span>
-            </>
-          )}
-        </button>
+        {!hideCollapseButton && (
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            className={cn(
+              "flex items-center gap-3 w-full py-2 rounded-[10px] text-sm font-medium transition-all duration-150 text-white/70 hover:bg-white/10 hover:text-white",
+              isCollapsed ? "justify-center px-0" : "px-3"
+            )}
+          >
+            {isCollapsed ? (
+              <ChevronsRight className="w-4.5 h-4.5" />
+            ) : (
+              <>
+                <ChevronsLeft className="w-4.5 h-4.5" />
+                <span>Collapse</span>
+              </>
+            )}
+          </button>
+        )}
       </div>
     </aside>
   );

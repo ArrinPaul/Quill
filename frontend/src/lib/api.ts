@@ -15,7 +15,7 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
   } else if (typeof window !== "undefined") {
-    const storedToken = localStorage.getItem("UniKit_token");
+    const storedToken = localStorage.getItem("Quill_token");
     if (storedToken) {
       headers["Authorization"] = `Bearer ${storedToken}`;
     }

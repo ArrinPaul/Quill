@@ -98,9 +98,9 @@ function Header() {
         >
           <Link href="/" className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-primary shadow-sm flex items-center justify-center">
-              <img src="/logo-ukit.png" alt="UniKit Logo" className="w-6 h-6 object-contain" />
+              <img src="/logo-quill.png" alt="Quill Logo" className="w-6 h-6 object-contain" />
             </div>
-            <span className="text-2xl font-bold tracking-tight text-foreground">UniKit</span>
+            <span className="text-2xl font-bold tracking-tight text-foreground">Quill</span>
           </Link>
           
           <nav className="hidden md:flex items-center gap-8">
@@ -255,7 +255,7 @@ function TelegramMockup() {
           <Bot className="w-5 h-5 text-primary" />
         </div>
         <div>
-          <div className="font-semibold text-sm text-foreground leading-tight">UniKit Bot</div>
+          <div className="font-semibold text-sm text-foreground leading-tight">Quill AI</div>
           <div className="text-xs text-primary font-medium leading-tight">bot</div>
         </div>
       </div>
@@ -396,7 +396,7 @@ function Hero() {
             }}
             className="mt-8 max-w-[480px] text-[clamp(1rem,1.2vw,1.18rem)] leading-[1.42] font-medium text-pretty text-muted-foreground backdrop-blur-[1px]"
           >
-            UniKit unifies deadlines, attendance, notices, and AI tools so your academic life
+            Quill unifies deadlines, attendance, notices, and AI tools so your academic life
             moves from chaos to clarity — automatically.
           </motion.p>
 
@@ -763,7 +763,7 @@ function AIFeatureVisual({ title }: { title: string }) {
             <div className="w-5 h-5 rounded-full bg-blue-500/10 flex items-center justify-center">
               <Send className="w-3 h-3 text-blue-500 -ml-0.5" />
             </div>
-            <span className="text-xs font-semibold text-foreground">UniKit Bot</span>
+            <span className="text-xs font-semibold text-foreground">Quill AI</span>
           </div>
           <p className="text-xs text-muted-foreground leading-snug">
             <strong className="text-foreground font-semibold">Reminder:</strong> DB Assignment is due in 2 hours!
@@ -858,11 +858,11 @@ function AIFeatures() {
   );
 }
 const comparisons = [
-  { feature: "Tool Management", traditional: "Multiple disconnected tools with separate logins", UniKit: "Single platform with integrated modules", icon: LayoutDashboard },
-  { feature: "Context Switching", traditional: "Constant switching between apps disrupts focus", UniKit: "Seamless workflow with everything in one place", icon: Zap },
-  { feature: "Reminders", traditional: "Manual calendar entries and phone alarms", UniKit: "Automatic Telegram alerts before deadlines", icon: Bell },
-  { feature: "Notice Processing", traditional: "Read entire long documents manually", UniKit: "AI-powered 3-bullet summaries in seconds", icon: FileText },
-  { feature: "Attendance Tracking", traditional: "Manual spreadsheet tracking and guesswork", UniKit: "Real-time per-subject risk alerts", icon: BarChart3 },
+  { feature: "Tool Management", traditional: "Multiple disconnected tools with separate logins", quill: "Single platform with integrated modules", icon: LayoutDashboard },
+  { feature: "Context Switching", traditional: "Constant switching between apps disrupts focus", quill: "Seamless workflow with everything in one place", icon: Zap },
+  { feature: "Reminders", traditional: "Manual calendar entries and phone alarms", quill: "Smart deadline & Google Calendar alerts", icon: Bell },
+  { feature: "Notice Processing", traditional: "Read entire long documents manually", quill: "AI-powered 3-bullet summaries in seconds", icon: FileText },
+  { feature: "Attendance Tracking", traditional: "Manual spreadsheet tracking and guesswork", quill: "Real-time per-subject risk alerts", icon: BarChart3 },
 ];
 
 function WhyUs() {
@@ -885,13 +885,13 @@ function WhyUs() {
         >
           <span className="inline-flex items-center gap-2 px-4 py-1.5 text-xs font-semibold text-primary bg-primary/10 rounded-[10px] mb-4">
             <Shield className="w-3.5 h-3.5" />
-            WHY UniKit?
+            WHY QUILL?
           </span>
           <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4 tracking-tight">
             Less Context Switching
           </h2>
           <p className="text-muted-foreground max-w-xl mx-auto">
-            Stop juggling multiple apps. UniKit puts everything you need in one place.
+            Stop juggling multiple apps. Quill puts everything you need in one place.
           </p>
         </motion.div>
 
@@ -940,7 +940,7 @@ function WhyUs() {
                 <div className="w-10 h-10 rounded-[10px] bg-primary/10 flex items-center justify-center">
                   <CheckCircle className="w-5 h-5 text-primary" />
                 </div>
-                <h3 className="text-lg font-bold text-foreground">The UniKit Way</h3>
+                <h3 className="text-lg font-bold text-foreground">The Quill Way</h3>
               </div>
               <div className="space-y-4">
                 {comparisons.map((row, i) => (
@@ -956,7 +956,7 @@ function WhyUs() {
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-foreground mb-0.5">{row.feature}</p>
-                      <p className="text-sm text-primary font-medium">{row.UniKit}</p>
+                      <p className="text-sm text-primary font-medium">{row.quill}</p>
                     </div>
                   </motion.div>
                 ))}
@@ -1020,7 +1020,7 @@ function ReplaceTools() {
         >
           <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4 tracking-tight">
             Replace Multiple Tools with{" "}
-            <span className="text-primary">UniKit</span>
+            <span className="text-primary">Quill</span>
           </h2>
           <p className="text-muted-foreground max-w-xl mx-auto">
             One platform to rule them all. Stop paying for five different apps.
@@ -1065,10 +1065,10 @@ function ReplaceTools() {
             <div className="bg-white border-2 border-primary/20 rounded-[10px] p-6 shadow-lg shadow-primary/10">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-12 h-12 rounded-[10px] bg-primary flex items-center justify-center shadow-md shadow-primary/20">
-                  <img src="/logo-ukit.png" alt="UniKit Logo" className="w-6 h-6 object-contain" />
+                  <img src="/logo-quill.png" alt="Quill Logo" className="w-6 h-6 object-contain" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-foreground">UniKit</h3>
+                  <h3 className="text-xl font-bold text-foreground">Quill</h3>
                   <p className="text-sm text-primary font-medium">All-in-one student hub</p>
                 </div>
               </div>
@@ -1090,7 +1090,7 @@ function ReplaceTools() {
 
 
 const faqs = [
-  { question: "Is UniKit completely free?", answer: "Yes! UniKit is free for students during our public beta. We want to ensure every student has access to these tools without barriers." },
+  { question: "Is Quill completely free?", answer: "Yes! Quill is free for students during our public beta. We want to ensure every student has access to these tools without barriers." },
   { question: "How does the Telegram bot work?", answer: "We connect directly to your college notice groups. Our AI reads the incoming messages and sends you a 3-bullet summary instantly." },
   { question: "Can I manage multiple subjects?", answer: "Absolutely. You can track attendance, deadlines, and tasks for as many subjects as you need in one centralized dashboard." },
   { question: "Is my data secure?", answer: "Your data is encrypted and securely stored. We never share your personal information or academic data with third parties." }
@@ -1193,9 +1193,9 @@ function Footer() {
           <div className="lg:col-span-5 flex flex-col items-start">
             <Link href="/" className="flex items-center gap-3 mb-6 group">
               <div className="w-12 h-12 rounded-[12px] bg-primary flex items-center justify-center shadow-md shadow-primary/20 group-hover:shadow-lg group-hover:shadow-primary/30 transition-all duration-300">
-                <img src="/logo-ukit.png" alt="UniKit Logo" className="w-7 h-7 object-contain" />
+                <img src="/logo-quill.png" alt="Quill Logo" className="w-7 h-7 object-contain" />
               </div>
-              <span className="text-2xl font-bold tracking-tight text-foreground">UniKit</span>
+              <span className="text-2xl font-bold tracking-tight text-foreground">Quill</span>
             </Link>
             <p className="text-base text-muted-foreground leading-relaxed max-w-sm mb-8">
               Your distraction-free campus productivity platform. Unifying deadlines, tasks, and AI tools into one seamless workflow.
@@ -1244,7 +1244,7 @@ function Footer() {
         
         <div className="pt-8 border-t border-border/60 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-sm text-muted-foreground font-medium">
-            &copy; {new Date().getFullYear()} UniKit. All rights reserved.
+            &copy; {new Date().getFullYear()} Quill. All rights reserved.
           </p>
           <div className="flex items-center gap-6">
             <a href="#" className="text-sm text-muted-foreground font-medium hover:text-foreground transition-colors">Privacy Policy</a>

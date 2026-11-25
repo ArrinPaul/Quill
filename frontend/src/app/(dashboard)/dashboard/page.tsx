@@ -16,13 +16,22 @@ import { CampusNewsWidget } from "@/components/dashboard/CampusNewsWidget";
 import { AchievementWidget } from "@/components/dashboard/AchievementWidget";
 import { OnboardingTour } from "@/components/dashboard/OnboardingTour";
 import { MonthlyCalendarWidget } from "@/components/dashboard/MonthlyCalendarWidget";
-import { Calendar as CalendarDays, CheckCircle, Clock, List as ListTodo } from "@untitledui/icons";
+import { Calendar as CalendarDays, CheckCircle, Clock, List as ListTodo, XClose as X } from "@untitledui/icons";
 import { api } from "@/lib/api";
 import type { Task, Attendance } from "@/features/types";
 
 
 function PopoutWidget({ children }: { children: React.ReactNode }) {
   const [isExpanded, setIsExpanded] = useState(false);
+
+  useEffect(() => {
+    if (!isExpanded) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsExpanded(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isExpanded]);
 
   return (
     <div className="relative w-full h-full">
@@ -50,6 +59,8 @@ function PopoutWidget({ children }: { children: React.ReactNode }) {
           />
         )}
         <div
+          role={isExpanded ? "dialog" : undefined}
+          aria-modal={isExpanded ? true : undefined}
           className={
             isExpanded
               ? "relative z-10 w-full max-w-4xl max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200 rounded-xl shadow-2xl ring-1 ring-border bg-background"
@@ -57,6 +68,19 @@ function PopoutWidget({ children }: { children: React.ReactNode }) {
           }
           onClick={isExpanded ? (e) => e.stopPropagation() : undefined}
         >
+          {isExpanded && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsExpanded(false);
+              }}
+              aria-label="Close expanded widget"
+              className="absolute top-3 right-3 z-20 p-1.5 rounded-full bg-muted/80 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
           {React.isValidElement(children)
             ? React.cloneElement(children as React.ReactElement<{ isExpanded?: boolean }>, { isExpanded })
             : children}
@@ -71,6 +95,13 @@ export default function DashboardPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [attendance, setAttendance] = useState<Attendance[]>([]);
   const [loading, setLoading] = useState(true);
+  const [now, setNow] = useState<Date | null>(null);
+
+  useEffect(() => {
+    setNow(new Date());
+    const timer = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     Promise.all([
@@ -85,14 +116,16 @@ export default function DashboardPage() {
   }, []);
 
   const getGreeting = () => {
-    const hour = new Date().getHours();
+    if (!now) return "Welcome back";
+    const hour = now.getHours();
     if (hour < 12) return "Good morning";
     if (hour < 17) return "Good afternoon";
     return "Good evening";
   };
 
   const getFormattedDate = () => {
-    return new Date().toLocaleDateString("en-US", {
+    if (!now) return "";
+    return now.toLocaleDateString("en-US", {
       weekday: "long",
       month: "long",
       day: "numeric",
@@ -100,7 +133,8 @@ export default function DashboardPage() {
   };
 
   const getFormattedTime = () => {
-    return new Date().toLocaleTimeString("en-US", {
+    if (!now) return "";
+    return now.toLocaleTimeString("en-US", {
       hour: "2-digit",
       minute: "2-digit",
     });

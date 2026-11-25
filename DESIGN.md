@@ -1,5 +1,5 @@
 ---
-name: UniKit
+name: Quill
 description: A comprehensive, distraction-free campus productivity platform
 colors:
   primary: "hsl(280 77% 23%)"
@@ -25,13 +25,13 @@ components:
     rounded: "{rounded.lg}"
 ---
 
-# Design System: UniKit
+# Design System: Quill
 
 ## Overview
 
 **Creative North Star: "The Focused Academic"**
 
-UniKit is designed to minimize cognitive load while keeping students highly organized. The interface is exceptionally clean, utilizing generous negative space, warm off-white backgrounds, and a singular, strong "Deep Amethyst" accent color to draw attention strictly to what matters.
+Quill is designed to minimize cognitive load while keeping students highly organized. The interface is exceptionally clean, utilizing generous negative space, warm off-white backgrounds, and a singular, strong "Deep Amethyst" accent color to draw attention strictly to what matters.
 
 **Key Characteristics:**
 - High-contrast, singular accent color (Deep Amethyst).

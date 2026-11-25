@@ -116,8 +116,10 @@ export const AiPanel = memo(function AiPanel({ isOpen, onToggle, shapes, onAddSh
   if (!isOpen) {
     return (
       <button
+        type="button"
         onClick={onToggle}
-        className="fixed right-4 top-1/2 -translate-y-1/2 z-50 bg-primary text-primary-foreground p-3 rounded-full shadow-lg hover:opacity-90 transition-opacity cursor-pointer"
+        aria-label="Open AI Panel"
+        className="absolute right-4 top-1/2 -translate-y-1/2 z-30 bg-primary text-primary-foreground p-3 rounded-full shadow-lg hover:opacity-90 transition-opacity cursor-pointer"
         title="Open AI Panel"
       >
         <Bot className="w-5 h-5" />
@@ -126,7 +128,7 @@ export const AiPanel = memo(function AiPanel({ isOpen, onToggle, shapes, onAddSh
   }
 
   return (
-    <div className="w-[340px] border-l border-border bg-white flex flex-col h-full">
+    <div className="w-72 sm:w-[340px] border-l border-border bg-white flex flex-col h-full">
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <h3 className="font-semibold text-sm flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-primary" />

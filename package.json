@@ -1,5 +1,5 @@
 {
-  "name": "campusflow-root",
+  "name": "quill-root",
   "private": true,
   "engines": {
     "node": "24.x"

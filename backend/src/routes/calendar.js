@@ -58,7 +58,7 @@ router.post("/fan-out", async (req, res) => {
         const eventDate = new Date(event.event_date);
         await createCalendarEvent(accessToken, {
           summary: `[${event.category || "Deadline"}] ${event.title}`,
-          description: `Priority: ${event.priority || "Medium"}\nCategory: ${event.category || "Other"}\n\nOriginal message: ${event.raw_message || "N/A"}\n\nSynced via CampusFlow NotifyMe`,
+          description: `Priority: ${event.priority || "Medium"}\nCategory: ${event.category || "Other"}\n\nOriginal message: ${event.raw_message || "N/A"}\n\nSynced via Quill`,
           start: {
             date: event.event_date, // All-day event (event_date is DATE, not DATETIME)
           },
@@ -147,10 +147,10 @@ router.get("/feed/:student_id", async (req, res) => {
     let icsLines = [
       "BEGIN:VCALENDAR",
       "VERSION:2.0",
-      "PRODID:-//UniKit//CampusFlow//EN",
+      "PRODID:-//Quill//Quill Calendar//EN",
       "CALSCALE:GREGORIAN",
       "METHOD:PUBLISH",
-      "X-WR-CALNAME:UniKit Deadlines",
+      "X-WR-CALNAME:Quill Deadlines",
       "X-WR-TIMEZONE:UTC",
     ];
 
@@ -160,7 +160,7 @@ router.get("/feed/:student_id", async (req, res) => {
       const dtEnd = formatIcsDate(new Date(new Date(t.deadline).getTime() + 3600000));
       icsLines.push(
         "BEGIN:VEVENT",
-        `UID:task-${t.id}@unikit.app`,
+        `UID:task-${t.id}@quill.app`,
         `DTSTAMP:${formatIcsDate(new Date())}`,
         `DTSTART:${dtStart}`,
         `DTEND:${dtEnd}`,
@@ -181,7 +181,7 @@ router.get("/feed/:student_id", async (req, res) => {
       
       icsLines.push(
         "BEGIN:VEVENT",
-        `UID:event-${e.id}@unikit.app`,
+        `UID:event-${e.id}@quill.app`,
         `DTSTAMP:${formatIcsDate(new Date())}`,
         `DTSTART;VALUE=DATE:${start}`,
         `DTEND;VALUE=DATE:${end}`,
@@ -194,7 +194,7 @@ router.get("/feed/:student_id", async (req, res) => {
     icsLines.push("END:VCALENDAR");
 
     res.setHeader("Content-Type", "text/calendar; charset=utf-8");
-    res.setHeader("Content-Disposition", `attachment; filename="unikit-calendar.ics"`);
+    res.setHeader("Content-Disposition", `attachment; filename="quill-calendar.ics"`);
     res.send(icsLines.join("\r\n"));
   } catch (error) {
     console.error("Calendar feed error:", error.message);

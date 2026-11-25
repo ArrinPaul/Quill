@@ -2,7 +2,6 @@ const express = require("express");
 const { getClient } = require("../services/supabase");
 const authMiddleware = require("../middleware/auth");
 const { summarizeNotice } = require("../services/groq");
-const { triggerN8nNotice } = require("../services/n8n");
 
 const router = express.Router();
 
@@ -53,50 +52,7 @@ router.post("/", async (req, res) => {
 });
 
 router.post("/broadcast", async (req, res) => {
-  try {
-    const { notice_id } = req.body;
-
-    const { data: notice, error: noticeError } = await getClient()
-      .from("notices")
-      .select("*")
-      .eq("id", notice_id)
-      .eq("student_id", req.student.id)
-      .single();
-
-    if (noticeError || !notice) {
-      return res.status(404).json({ message: "Notice not found" });
-    }
-
-    const { data: student } = await getClient()
-      .from("students")
-      .select("name, telegram_username")
-      .eq("id", req.student.id)
-      .single();
-
-    const result = await triggerN8nNotice({
-      studentName: student?.name,
-      telegramUsername: student?.telegram_username,
-      aiSummary: notice.ai_summary,
-      eventTitle: notice.event_title,
-      eventDate: notice.event_date,
-    });
-
-    await getClient()
-      .from("notices")
-      .update({ broadcast_status: result.success ? "sent" : "failed" })
-      .eq("id", notice_id);
-
-    await getClient().from("automation_logs").insert({
-      student_id: req.student.id,
-      workflow_type: "notice_broadcast",
-      status: result.success ? "success" : "failed",
-      details: { notice_id },
-    });
-
-    res.json({ success: result.success });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+  res.status(410).json({ message: "Notice broadcast via n8n/Telegram has been removed." });
 });
 
 module.exports = router;

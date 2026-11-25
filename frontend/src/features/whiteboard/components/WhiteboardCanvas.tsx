@@ -179,7 +179,7 @@ export function WhiteboardCanvas({ whiteboardId, title, onBack }: WhiteboardCanv
 
           {/* Floating Selection Action Bar — appears when shape(s) are selected */}
           {engine.selectedIds.length > 0 && !engine.editingId && (
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1 bg-white border border-border shadow-lg rounded-[10px] px-2 py-1.5 animate-in fade-in slide-in-from-top-2 duration-150">
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 flex flex-wrap items-center justify-center gap-1 max-w-[95%] bg-white border border-border shadow-lg rounded-[10px] px-2 py-1.5 animate-in fade-in slide-in-from-top-2 duration-150">
               <span className="text-xs font-semibold text-muted-foreground px-1 border-r border-border mr-1">
                 {engine.selectedIds.length} selected
               </span>

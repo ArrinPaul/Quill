@@ -26,6 +26,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -37,7 +38,7 @@ export default function LoginPage() {
     }
 
     if (token) {
-      localStorage.setItem("UniKit_token", token);
+      localStorage.setItem("Quill_token", token);
       window.location.href = "/dashboard";
     }
   }, []);
@@ -57,11 +58,14 @@ export default function LoginPage() {
   };
 
   const handleGoogleLogin = async () => {
+    setError("");
+    setGoogleLoading(true);
     try {
       const res = await api.get<{ url: string }>("/api/auth/google/url");
       window.location.href = res.url;
     } catch {
       setError("Failed to initiate Google login");
+      setGoogleLoading(false);
     }
   };
 
@@ -73,7 +77,7 @@ export default function LoginPage() {
       </div>
 
       {error && (
-        <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-[10px] text-sm text-destructive">
+        <div role="alert" className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-[10px] text-sm text-destructive">
           {error}
         </div>
       )}
@@ -110,18 +114,13 @@ export default function LoginPage() {
             />
             <button
               type="button"
+              aria-label={showPassword ? "Hide password" : "Show password"}
               onClick={() => setShowPassword(!showPassword)}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             >
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
-        </div>
-
-        <div className="text-right">
-          <a href="#" className="text-xs text-primary hover:underline">
-            Forgot Password?
-          </a>
         </div>
 
         <button
@@ -153,10 +152,12 @@ export default function LoginPage() {
           </button>
         )}
         <button
+          type="button"
           onClick={handleGoogleLogin}
-          className="w-full py-2.5 border border-border rounded-full text-sm font-medium text-foreground hover:bg-muted transition-standard flex items-center justify-center gap-2"
+          disabled={googleLoading}
+          className="w-full py-2.5 border border-border rounded-full text-sm font-medium text-foreground hover:bg-muted transition-standard flex items-center justify-center gap-2 disabled:opacity-50"
         >
-          <svg className="w-5 h-5" viewBox="0 0 24 24">
+          <svg aria-hidden="true" className="w-5 h-5" viewBox="0 0 24 24">
             <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
             <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
             <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>

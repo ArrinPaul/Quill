@@ -27,7 +27,7 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -39,7 +39,7 @@ export default function SignupPage() {
     }
 
     if (token) {
-      localStorage.setItem("unikit_token", token);
+      localStorage.setItem("Quill_token", token);
       window.location.href = "/dashboard";
     }
   }, []);
@@ -60,11 +60,14 @@ export default function SignupPage() {
   const strengthLabels = ["", "Very Weak", "Weak", "Fair", "Strong", "Very Strong"];
 
   const handleGoogleLogin = async () => {
+    setError("");
+    setGoogleLoading(true);
     try {
       const res = await api.get<{ url: string }>("/api/auth/google/url");
       window.location.href = res.url;
     } catch {
       setError("Failed to initiate Google login");
+      setGoogleLoading(false);
     }
   };
 
@@ -111,9 +114,8 @@ export default function SignupPage() {
           password: form.password,
           branch: form.branch,
           year: Number(form.year),
-          telegram_username: "", // No longer required manually
-        }, false); // redirect = false
-        setStep(3);
+          telegram_username: "",
+        }, true);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Registration failed");
       } finally {
@@ -127,46 +129,12 @@ export default function SignupPage() {
     setStep((prev) => prev - 1);
   };
 
-  // Telegram Sync Polling
-  const [telegramData, setTelegramData] = useState<{ deep_link?: string; link_code?: string; connected?: boolean; bot_username?: string } | null>(null);
-  
-  const handleCopy = () => {
-    if (telegramData?.link_code) {
-      navigator.clipboard.writeText(telegramData.link_code);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
-  useEffect(() => {
-    if (step === 3) {
-      const checkStatus = async () => {
-        try {
-          const res = await api.get<{ deep_link?: string; link_code?: string; connected?: boolean; bot_username?: string }>("/api/telegram/status");
-          setTelegramData(res);
-          if (res.connected) {
-            // Wait 2 seconds and auto-redirect
-            setTimeout(() => {
-              router.push("/dashboard");
-            }, 2000);
-          }
-        } catch (e) {
-          console.error(e);
-        }
-      };
-      
-      checkStatus();
-      const interval = setInterval(checkStatus, 5000);
-      return () => clearInterval(interval);
-    }
-  }, [step, router]);
-
   return (
     <div className="bg-white rounded-[10px] border border-border p-5 sm:p-6 shadow-sm w-full">
       {/* Progress Indicator */}
       <div className="flex gap-2 mb-4">
         <div className={`h-1.5 flex-1 rounded-full transition-colors ${step >= 1 ? "bg-primary" : "bg-muted"}`} />
         <div className={`h-1.5 flex-1 rounded-full transition-colors ${step >= 2 ? "bg-primary" : "bg-muted"}`} />
-        <div className={`h-1.5 flex-1 rounded-full transition-colors ${step >= 3 ? "bg-primary" : "bg-muted"}`} />
       </div>
 
       <div className="mb-4 flex items-center justify-between">
@@ -331,83 +299,19 @@ export default function SignupPage() {
           </div>
         )}
 
-        {/* STEP 3: TELEGRAM INFO */}
-        {step === 3 && (
-          <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
-            <div className="p-3 bg-blue-500/10 text-blue-700 border border-blue-500/20 rounded-[10px] text-xs leading-relaxed text-center font-medium">
-              Link your Telegram to get AI-powered reminders for classes, attendance alerts, and deadline summaries instantly!
-            </div>
-            
-            <div className="flex flex-col items-center gap-3 py-2">
-              {telegramData?.connected ? (
-                <div className="flex flex-col items-center gap-2 animate-in fade-in duration-300">
-                  <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                    <Check className="w-6 h-6 text-green-600" />
-                  </div>
-                  <p className="text-sm font-bold text-green-700">Telegram Linked!</p>
-                  <p className="text-xs text-muted-foreground">Redirecting you to dashboard...</p>
-                </div>
-              ) : (
-                <>
-                  <div className="text-center">
-                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Your Link Code</p>
-                    <button 
-                      type="button" 
-                      onClick={handleCopy}
-                      className="px-4 py-2 bg-muted text-foreground font-mono font-bold text-lg rounded-[8px] border border-border block mx-auto hover:bg-muted/80 transition-colors cursor-pointer"
-                      title="Click to copy"
-                    >
-                      {copied ? "Copied!" : telegramData?.link_code || "..."}
-                    </button>
-                  </div>
-                  
-                  <a
-                    href={telegramData?.deep_link || "#"}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="w-full py-2.5 bg-[#2AABEE] text-white text-sm font-medium rounded-full hover:bg-[#229ED9] transition-colors flex items-center justify-center gap-2"
-                  >
-                    <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                      <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a58.315 58.315 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.892-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
-                    </svg>
-                    Link Telegram Now
-                  </a>
-                  <p className="text-[10px] text-muted-foreground text-center px-4">
-                    Click the button above and press "Start" in Telegram. <br/>
-                    Or manually message <strong>@{telegramData?.bot_username || "unialert0bot"}</strong> and send: <br/>
-                    <code className="bg-muted px-1 py-0.5 rounded text-foreground font-mono">/link {telegramData?.link_code || "UK-XXXX"}</code>
-                  </p>
-                </>
-              )}
-            </div>
-          </div>
-        )}
-
-        {step < 3 ? (
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2 mt-4 bg-primary text-white text-sm font-medium rounded-full hover:bg-primary/90 transition-standard disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {loading ? (
-              step === 1 ? "Checking..." : "Creating account..."
-            ) : step === 1 ? (
-              <>Next <ArrowRight className="w-4 h-4" /></>
-            ) : (
-              <>Create Account <Check className="w-4 h-4" /></>
-            )}
-          </button>
-        ) : (
-          !telegramData?.connected && (
-            <button
-              type="button"
-              onClick={() => router.push("/dashboard")}
-              className="w-full py-2 mt-2 bg-transparent text-muted-foreground text-sm font-medium rounded-full hover:bg-muted transition-standard"
-            >
-              Skip for now
-            </button>
-          )
-        )}
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full py-2 mt-4 bg-primary text-white text-sm font-medium rounded-full hover:bg-primary/90 transition-standard disabled:opacity-50 flex items-center justify-center gap-2"
+        >
+          {loading ? (
+            step === 1 ? "Checking..." : "Creating account..."
+          ) : step === 1 ? (
+            <>Next <ArrowRight className="w-4 h-4" /></>
+          ) : (
+            <>Create Account <Check className="w-4 h-4" /></>
+          )}
+        </button>
       </form>
 
       {step === 1 && (
@@ -423,8 +327,10 @@ export default function SignupPage() {
 
           <div className="space-y-2">
             <button
+              type="button"
               onClick={handleGoogleLogin}
-              className="w-full py-2 border border-border rounded-full text-sm font-medium text-foreground hover:bg-muted transition-standard flex items-center justify-center gap-2"
+              disabled={googleLoading}
+              className="w-full py-2 border border-border rounded-full text-sm font-medium text-foreground hover:bg-muted transition-standard flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <svg className="w-4 h-4" viewBox="0 0 24 24">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>

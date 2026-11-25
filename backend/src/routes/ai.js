@@ -1,6 +1,5 @@
 const express = require("express");
 const multer = require("multer");
-const pdfParse = require("pdf-parse");
 const authMiddleware = require("../middleware/auth");
 const {
   getStudyTip,
@@ -28,6 +27,10 @@ router.post("/parse-document", authMiddleware, upload.single("document"), async 
     
     if (extension === 'pdf') {
       try {
+        if (typeof globalThis.DOMMatrix === "undefined") {
+          globalThis.DOMMatrix = class DOMMatrix {};
+        }
+        const pdfParse = require("pdf-parse");
         if (typeof pdfParse === 'function') {
           const pdfData = await pdfParse(file.buffer);
           text = pdfData.text;

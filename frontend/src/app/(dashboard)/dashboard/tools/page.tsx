@@ -237,21 +237,21 @@ export default function SmartToolsPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto h-[calc(100vh-6rem)] flex flex-col">
+    <div className="max-w-7xl mx-auto min-h-[calc(100vh-6rem)] flex flex-col">
       
       {/* Page Header */}
       <div className="flex items-center justify-between mb-6 flex-shrink-0">
         <h1 className="text-2xl font-bold text-foreground">Smart Tools</h1>
       </div>
 
-      {error && (
-        <div className="p-4 mb-6 bg-destructive/10 border border-destructive/20 rounded-[10px] text-sm text-red-700 flex-shrink-0">
+      {error && !activeTool && (
+        <div role="alert" className="p-4 mb-6 bg-destructive/10 border border-destructive/20 rounded-[10px] text-sm text-destructive flex-shrink-0">
           {error}
         </div>
       )}
 
       {/* Grid of Tools */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-1 min-h-0 pb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-1 min-h-0 overflow-y-auto pb-6">
         {TOOLS_CONFIG.map((tool) => {
           const Icon = tool.icon;
           return (
@@ -290,6 +290,8 @@ export default function SmartToolsPage() {
             <div className="flex items-center justify-between border-b border-border pb-4 mb-4">
               <h2 className="text-lg font-bold text-foreground">{activeTool.title}</h2>
               <button 
+                type="button"
+                aria-label="Close tool"
                 onClick={handleCloseTool}
                 className="p-1 hover:bg-accent rounded-full text-muted-foreground transition-standard cursor-pointer"
               >
@@ -297,10 +299,16 @@ export default function SmartToolsPage() {
               </button>
             </div>
 
+            {error && (
+              <div role="alert" className="p-3 mb-4 bg-destructive/10 border border-destructive/20 rounded-[10px] text-sm text-destructive">
+                {error}
+              </div>
+            )}
+
             {/* Modal Body */}
             <div className="space-y-4 flex-1">
               <div>
-                <div className="flex items-center justify-between mb-1.5">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
                   <label className="block text-sm font-medium text-foreground">
                     Source Material / Text Input
                   </label>
@@ -322,7 +330,7 @@ export default function SmartToolsPage() {
                           const formData = new FormData();
                           formData.append("document", file);
                           
-                          const token = localStorage.getItem("UniKit_token");
+                          const token = localStorage.getItem("Quill_token");
                           const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:4000"}/api/ai/parse-document`, {
                             method: "POST",
                             headers: {

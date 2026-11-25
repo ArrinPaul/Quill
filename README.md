@@ -1,10 +1,10 @@
-# UniKit: AI-Powered Student Hub and Study Assistant
+# Quill: AI-Powered Student Hub and Study Assistant
 
-## What is UniKit?
-UniKit (formerly CampusFlow) is a production-grade, full-stack campus management and cognitive study assistant platform. It merges automated administrative tools—such as task scheduling, attendance risk metrics, Telegram notifications, and notice broadcasts—with a NotebookLM-inspired study workspace and a visual collaboration whiteboard.
+## What is Quill?
+Quill (formerly UniKit / CampusFlow) is a production-grade, full-stack campus management and cognitive study assistant platform. It merges automated administrative tools—such as task scheduling, attendance risk metrics, Google Calendar sync, and notice summarization—with a NotebookLM-inspired study workspace and a visual collaboration whiteboard.
 
-## Why UniKit?
-The core philosophy behind UniKit is "The Focused Academic." University life is often cluttered with numerous portals, apps, and distractions. UniKit is designed to minimize cognitive load while keeping students highly organized. 
+## Why Quill?
+The core philosophy behind Quill is "The Focused Academic." University life is often cluttered with numerous portals, apps, and distractions. Quill is designed to minimize cognitive load while keeping students highly organized. 
 
 - **Distraction-Free Environment:** The interface is exceptionally clean, utilizing generous negative space, warm off-white backgrounds, and a singular "Deep Amethyst" accent color to draw attention strictly to what matters.
 - **Unified Workflow:** It brings together scheduling, attendance tracking, note-taking, and AI-driven study tools into a single, cohesive platform.

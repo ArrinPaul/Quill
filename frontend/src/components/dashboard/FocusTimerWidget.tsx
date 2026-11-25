@@ -98,14 +98,14 @@ export function FocusTimerWidget() {
   const adjustTime = (minutes: number, e?: React.MouseEvent) => {
     e?.stopPropagation();
     setTotalSeconds((prev) => {
-      const newTotal = Math.max(0, prev + minutes * 60);
+      const newTotal = Math.max(60, prev + minutes * 60);
       setMaxSeconds((max) => Math.max(max, newTotal));
       return newTotal;
     });
   };
 
   const handleSessionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = Number(e.target.value);
+    const val = Math.max(1, Number(e.target.value) || 1);
     setSessionLength(val);
     if (!isRunning && !isBreak) {
       setTotalSeconds(val * 60);
@@ -114,7 +114,7 @@ export function FocusTimerWidget() {
   };
 
   const handleBreakChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = Number(e.target.value);
+    const val = Math.max(1, Number(e.target.value) || 1);
     setBreakLength(val);
     if (!isRunning && isBreak) {
       setTotalSeconds(val * 60);
@@ -136,7 +136,9 @@ export function FocusTimerWidget() {
         onClick={() => setIsExpanded(true)}
       >
         <button 
-          className="absolute top-4 right-4 p-2 bg-white/10 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/20"
+          type="button"
+          aria-label="Expand focus timer"
+          className="absolute top-4 right-4 p-2 bg-white/10 rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity hover:bg-white/20"
           onClick={(e) => { e.stopPropagation(); setIsExpanded(true); }}
         >
           <Maximize2 className="w-4 h-4" />

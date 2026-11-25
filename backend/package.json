@@ -1,7 +1,7 @@
 {
-  "name": "campusflow-backend",
+  "name": "quill-backend",
   "version": "1.0.0",
-  "description": "CampusFlow Express backend",
+  "description": "Quill Express backend",
   "main": "src/index.js",
   "scripts": {
     "start": "set NODE_TLS_REJECT_UNAUTHORIZED=0&& node src/index.js",

@@ -37,6 +37,7 @@ export function UpcomingDeadlinesWidget({ tasks = [] }: UpcomingDeadlinesWidgetP
   nextWeek.setDate(nextWeek.getDate() + 7);
 
   const upcomingTasks = tasks.filter((task) => {
+    if (task.status === "completed") return false;
     const taskDate = new Date(task.deadline);
     return taskDate >= today && taskDate <= nextWeek;
   });
@@ -51,7 +52,7 @@ export function UpcomingDeadlinesWidget({ tasks = [] }: UpcomingDeadlinesWidgetP
           <h3 className="font-semibold text-foreground">Upcoming Deadlines</h3>
         </div>
         {upcomingTasks.length > 0 && (
-          <Link href="/dashboard/tasks" className="text-xs text-primary hover:text-primary/80 font-medium flex items-center gap-1 transition-colors">
+          <Link href="/dashboard/tasks" onClick={(e) => e.stopPropagation()} className="text-xs text-primary hover:text-primary/80 font-medium flex items-center gap-1 transition-colors">
             View All <ArrowRight className="w-3 h-3" />
           </Link>
         )}
@@ -66,6 +67,7 @@ export function UpcomingDeadlinesWidget({ tasks = [] }: UpcomingDeadlinesWidgetP
           <p className="text-xs text-muted-foreground mb-4">You&apos;re all caught up! Keep it up.</p>
           <Link
             href="/dashboard/tasks"
+            onClick={(e) => e.stopPropagation()}
             className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-white text-xs font-medium rounded-[10px] hover:bg-primary/90 transition-all"
           >
             <Plus className="w-3.5 h-3.5" /> Add Reminder
@@ -89,8 +91,10 @@ export function UpcomingDeadlinesWidget({ tasks = [] }: UpcomingDeadlinesWidgetP
                     href={generateGoogleCalendarUrl(task.title, task.description || "", task.deadline)}
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
                     className="p-1 hover:bg-blue-50 rounded-md text-muted-foreground hover:text-blue-600 transition-colors"
                     title="Add to Google Calendar"
+                    aria-label={`Add ${task.title} to Google Calendar`}
                   >
                     <Calendar className="w-4 h-4" />
                   </a>

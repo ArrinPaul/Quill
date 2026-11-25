@@ -84,8 +84,8 @@ export function MonthlyCalendarWidget() {
     selectedDate.getMonth() === month &&
     selectedDate.getFullYear() === year;
 
-  const getItemsForDay = (day: number): CalendarItem[] => {
-    const dayDate = new Date(year, month, day);
+  const getItemsForDay = (day: number, targetMonth = month, targetYear = year): CalendarItem[] => {
+    const dayDate = new Date(targetYear, targetMonth, day);
     dayDate.setHours(0, 0, 0, 0);
     const nextDay = new Date(dayDate);
     nextDay.setDate(dayDate.getDate() + 1);
@@ -129,7 +129,7 @@ export function MonthlyCalendarWidget() {
 
   const getSelectedDayItems = (): CalendarItem[] => {
     if (!selectedDate) return [];
-    return getItemsForDay(selectedDate.getDate());
+    return getItemsForDay(selectedDate.getDate(), selectedDate.getMonth(), selectedDate.getFullYear());
   };
 
   const calendarDays: (number | null)[] = [];
@@ -158,7 +158,7 @@ export function MonthlyCalendarWidget() {
 
   return (
     <div className="bg-white border border-border rounded-[10px] p-5 card-hover h-full">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-[10px] bg-primary/10 flex items-center justify-center">
             <CalendarDays className="w-4 h-4 text-primary" />
@@ -172,13 +172,13 @@ export function MonthlyCalendarWidget() {
           )}
         </div>
         <div className="flex items-center gap-1">
-          <button onClick={prevMonth} className="p-1.5 rounded-[10px] hover:bg-muted transition-colors" aria-label="Previous month">
+          <button type="button" onClick={(e) => { e.stopPropagation(); prevMonth(); }} className="p-1.5 rounded-[10px] hover:bg-muted transition-colors" aria-label="Previous month">
             <ChevronLeft className="w-4 h-4 text-muted-foreground" />
           </button>
-          <span className="text-sm font-medium text-foreground px-2 min-w-[120px] text-center">
+          <span className="text-sm font-medium text-foreground px-2 min-w-[110px] text-center">
             {MONTH_NAMES[month]} {year}
           </span>
-          <button onClick={nextMonth} className="p-1.5 rounded-[10px] hover:bg-muted transition-colors" aria-label="Next month">
+          <button type="button" onClick={(e) => { e.stopPropagation(); nextMonth(); }} className="p-1.5 rounded-[10px] hover:bg-muted transition-colors" aria-label="Next month">
             <ChevronRight className="w-4 h-4 text-muted-foreground" />
           </button>
         </div>
@@ -203,7 +203,10 @@ export function MonthlyCalendarWidget() {
           return (
             <button
               key={day}
-              onClick={() => setSelectedDate(new Date(year, month, day))}
+              type="button"
+              aria-label={`${MONTH_NAMES[month]} ${day}, ${year}`}
+              aria-pressed={Boolean(isSelected(day))}
+              onClick={(e) => { e.stopPropagation(); setSelectedDate(new Date(year, month, day)); }}
               className={`relative bg-white min-h-[48px] p-1 transition-colors hover:bg-primary/5 ${
                 isSelected(day) ? "bg-primary/10" : ""
               }`}
@@ -234,7 +237,8 @@ export function MonthlyCalendarWidget() {
 
       {!calendarConnected && (
         <button
-          onClick={handleConnectCalendar}
+          type="button"
+          onClick={(e) => { e.stopPropagation(); handleConnectCalendar(); }}
           className="w-full mb-3 flex items-center justify-center gap-2 py-2 px-3 rounded-[10px] border border-dashed border-blue-300 bg-blue-50/50 text-blue-600 text-xs font-medium hover:bg-blue-50 transition-colors"
         >
           <CalendarDays className="w-3.5 h-3.5" />

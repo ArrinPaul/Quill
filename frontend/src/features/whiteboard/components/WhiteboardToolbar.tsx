@@ -51,6 +51,9 @@ export const WhiteboardToolbar = memo(function WhiteboardToolbar({
         {TOOL_LIST.map(t => (
           <button
             key={t.id}
+            type="button"
+            aria-label={t.label}
+            aria-pressed={tool === t.id}
             onClick={() => onSetTool(t.id as ToolId)}
             title={`${t.label} (${t.key})`}
             className={`p-2 rounded-[6px] transition-colors cursor-pointer ${

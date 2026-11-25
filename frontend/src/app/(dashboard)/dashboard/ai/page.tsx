@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect } from "react";
 import { FaceSmile as Bot, Loading01 as Loader2, MessageSquare01 as MessageSquare, Send01 as Send, Stars01 as Sparkles, User01 as User } from "@untitledui/icons";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { api } from "@/lib/api";
 
 interface Message {
@@ -20,7 +22,7 @@ export default function AiAssistantPage() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: "Hello! I am Uki, your UniKit AI study assistant. How can I help you organize your schedule, explain academic topics, or prepare for exams today?"
+      content: "Hello! I am your Quill AI study assistant. How can I help you organize your schedule, explain academic topics, or prepare for exams today?"
     }
   ]);
   const [input, setInput] = useState("");
@@ -60,7 +62,7 @@ export default function AiAssistantPage() {
         ...prev,
         {
           role: "assistant",
-          content: "Sorry, I couldn't process that message. Please check if your backend and GROQ_API_KEY are configured."
+          content: "Sorry, I couldn't process that message right now. Please try again in a moment."
         }
       ]);
     } finally {
@@ -107,10 +109,14 @@ export default function AiAssistantPage() {
               </div>
               <div className={`p-4 rounded-[16px] text-sm leading-relaxed shadow-sm ${
                 msg.role === "user" 
-                  ? "bg-foreground text-background rounded-tr-sm" 
-                  : "bg-white border border-black/5 text-foreground rounded-tl-sm backdrop-blur-md"
+                  ? "bg-foreground text-background rounded-tr-sm whitespace-pre-wrap" 
+                  : "bg-white border border-black/5 text-foreground rounded-tl-sm backdrop-blur-md prose prose-sm max-w-none"
               }`}>
-                {msg.content}
+                {msg.role === "user" ? (
+                  msg.content
+                ) : (
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                )}
               </div>
             </div>
           ))}
@@ -157,6 +163,7 @@ export default function AiAssistantPage() {
           <div className="relative flex items-center bg-white border border-black/10 rounded-full shadow-sm hover:border-primary/30 transition-colors focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/10">
             <input
               type="text"
+              aria-label="Ask Uki anything"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSendMessage(input)}
@@ -165,6 +172,8 @@ export default function AiAssistantPage() {
               disabled={loading}
             />
             <button
+              type="button"
+              aria-label="Send message"
               onClick={() => handleSendMessage(input)}
               disabled={loading || !input.trim()}
               className="absolute right-2 p-2.5 bg-foreground text-background rounded-full hover:bg-primary hover:text-white transition-colors disabled:opacity-50 disabled:hover:bg-foreground disabled:hover:text-background cursor-pointer"

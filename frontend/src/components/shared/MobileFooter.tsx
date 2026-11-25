@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Announcement01 as Megaphone, FaceSmile as Bot, GitBranch01 as Workflow, List as ListTodo, Menu01 as Menu } from "@untitledui/icons";
+import { Announcement01 as Megaphone, FaceSmile as Bot, List as ListTodo, Menu01 as Menu, Settings01 as Settings } from "@untitledui/icons";
 import { cn } from "@/lib/utils";
 
 interface MobileFooterProps {
@@ -17,19 +17,21 @@ export function MobileFooter({ onMenuClick }: MobileFooterProps) {
     { href: "/dashboard/ai", icon: Bot, label: "AI" },
     { href: "/dashboard/tasks", icon: ListTodo, label: "Tasks" },
     { href: "/dashboard/notices", icon: Megaphone, label: "Notices" },
-    { href: "/dashboard/automations", icon: Workflow, label: "More" },
+    { href: "/dashboard/settings", icon: Settings, label: "Settings" },
   ];
 
-  const isActive = (href: string) => pathname === href;
+  const isActive = (href: string) => pathname === href || pathname?.startsWith(`${href}/`);
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 md:hidden bg-primary border-t border-white/10 z-50">
+    <div className="fixed bottom-0 left-0 right-0 md:hidden bg-primary border-t border-white/10 z-40">
       <nav className="flex items-center justify-around h-16">
         {items.map((item, i) => {
           if ("onClick" in item && item.onClick) {
             return (
               <button
                 key={i}
+                type="button"
+                aria-label="Open navigation menu"
                 onClick={item.onClick}
                 className="flex flex-col items-center gap-1 text-white/70 hover:text-white transition-standard"
               >

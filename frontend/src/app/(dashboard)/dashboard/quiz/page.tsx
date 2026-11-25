@@ -662,7 +662,7 @@ export default function QuizPage() {
                       </div>
                     </div>
 
-                    <div className="flex justify-center gap-3 pt-4 border-t border-[#f3eff8] max-w-md mx-auto">
+                    <div className="flex flex-wrap justify-center gap-3 pt-4 border-t border-[#f3eff8] max-w-md mx-auto">
                       <button onClick={handleRetake} className="px-4 py-2 border border-[#5b21b6] hover:bg-[#f1ecf8] text-primary font-semibold rounded-[10px] text-xs transition-standard flex items-center gap-1.5">
                         <RefreshCw className="w-3.5 h-3.5" /> Retake Quiz
                       </button>
@@ -693,7 +693,7 @@ export default function QuizPage() {
                                 const correctOne = q.correct_index === oidx;
                                 let style = "text-xs p-2.5 border rounded-[10px] flex items-center gap-2 font-sans ";
                                 if (correctOne) style += "border-purple-300 bg-purple-50/65 text-purple-800 font-semibold";
-                                else if (selectedByUs) style += "border-red-300 bg-destructive/10/65 text-red-800 font-semibold";
+                                else if (selectedByUs) style += "border-red-300 bg-destructive/15 text-red-800 font-semibold";
                                 else style += "border-border text-muted-foreground opacity-60";
 
                                 return (
