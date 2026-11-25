@@ -1,7 +1,7 @@
 {
   "name": "ai-smart-buddy",
   "version": "1.0.0",
-  "description": "AI-powered study assistant for CampusFlow",
+  "description": "AI-powered study assistant for Quill",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -15,7 +15,7 @@
     "campus",
     "education"
   ],
-  "author": "CampusFlow",
+  "author": "Quill",
   "license": "MIT",
   "dependencies": {},
   "engines": {

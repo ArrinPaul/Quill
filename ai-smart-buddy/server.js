@@ -148,7 +148,7 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, () => {
     console.log(`
-  AI Smart Buddy - CampusFlow
+  AI Smart Buddy - Quill
 
   Server running at: http://localhost:${PORT}
 

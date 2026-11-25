@@ -1,6 +1,6 @@
-# AI Smart Buddy - CampusFlow
+# AI Smart Buddy - Quill
 
-An AI-powered study assistant feature for CampusFlow web app.
+An AI-powered study assistant feature for Quill web app.
 
 ## Features
 

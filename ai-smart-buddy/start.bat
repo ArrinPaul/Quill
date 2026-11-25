@@ -1,7 +1,7 @@
 @echo off
 echo.
 echo ========================================
-echo   AI Smart Buddy - CampusFlow
+echo   AI Smart Buddy - Quill
 echo ========================================
 echo.
 
