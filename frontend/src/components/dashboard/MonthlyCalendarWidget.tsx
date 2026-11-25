@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Calendar as CalendarDays, ChevronLeft, ChevronRight, Link01 as Link2 } from "@untitledui/icons";
 import { api } from "@/lib/api";
+import { useAuth } from "@/hooks/useAuth";
 import type { Task } from "@/features/types";
 
 const MONTH_NAMES = [
@@ -28,6 +29,7 @@ interface CalendarItem {
 }
 
 export function MonthlyCalendarWidget() {
+  const { user } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [googleEvents, setGoogleEvents] = useState<GoogleCalendarEvent[]>([]);
   const [calendarConnected, setCalendarConnected] = useState(false);
@@ -139,8 +141,9 @@ export function MonthlyCalendarWidget() {
   const selectedItems = getSelectedDayItems();
 
   const handleConnectCalendar = async () => {
+    if (!user) return;
     try {
-      const res = await api.get<{ url: string }>("/api/auth/google/url");
+      const res = await api.get<{ url: string }>(`/api/auth/google/url?state=${user.id}`);
       window.location.href = res.url;
     } catch {
       // silently fail

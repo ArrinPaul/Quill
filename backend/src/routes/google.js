@@ -1,6 +1,4 @@
 const express = require("express");
-const jwt = require("jsonwebtoken");
-const bcrypt = require("bcryptjs");
 const { getClient } = require("../services/supabase");
 const { getAuthUrl, getTokensFromCode, getValidAccessToken } = require("../services/google");
 const authMiddleware = require("../middleware/auth");
@@ -11,6 +9,9 @@ const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
 
 router.get("/url", (req, res) => {
   const { state } = req.query;
+  if (!state) {
+    return res.status(400).json({ message: "Student state is required to link Google Calendar" });
+  }
   const url = getAuthUrl(state);
   res.json({ url });
 });
@@ -18,93 +19,52 @@ router.get("/url", (req, res) => {
 router.get("/callback", async (req, res) => {
   const { code, state } = req.query;
 
-  if (!code) {
-    return res.redirect(`${FRONTEND_URL}/login?error=no_code`);
+  if (!code || !state) {
+    return res.redirect(`${FRONTEND_URL}/dashboard/settings?calendar_error=missing_params`);
   }
 
   try {
     const tokens = await getTokensFromCode(code);
-
-    const ticket = await require("google-auth-library").OAuth2Client.prototype.verifyIdToken.call(
-      new (require("google-auth-library").OAuth2Client)(
-        process.env.GOOGLE_CLIENT_ID,
-        process.env.GOOGLE_CLIENT_SECRET
-      ),
-      { idToken: tokens.id_token, audience: process.env.GOOGLE_CLIENT_ID }
-    );
-
-    const payload = ticket.getPayload();
-    const { email, name, sub: googleId } = payload;
-
     const supabase = getClient();
 
-    let student = null;
-
-    if (state) {
-      const { data } = await supabase
-        .from("students")
-        .select("*")
-        .eq("id", state)
-        .single();
-      student = data;
-    }
+    const { data: student } = await supabase
+      .from("students")
+      .select("id")
+      .eq("id", state)
+      .single();
 
     if (!student) {
-      const { data } = await supabase
-        .from("students")
-        .select("*")
-        .eq("email", email)
-        .single();
-      student = data;
+      return res.redirect(`${FRONTEND_URL}/dashboard/settings?calendar_error=student_not_found`);
     }
 
-    if (!student) {
-      const password_hash = await bcrypt.hash(googleId, 10);
-      const { data: newStudent, error } = await supabase
-        .from("students")
-        .insert({
-          name: name || email.split("@")[0],
-          email,
-          password_hash,
-          branch: "Not Set",
-          year: 1,
-          telegram_username: "",
-          subjects: [],
-        })
-        .select("id, name, email, branch, year, telegram_username, subjects, created_at")
-        .single();
+    const { data: existingPref } = await supabase
+      .from("preferences")
+      .select("settings")
+      .eq("user_id", student.id)
+      .single();
 
-      if (error) throw error;
-      student = newStudent;
-    } else {
-      const { password_hash, ...rest } = student;
-      student = rest;
-    }
+    const existingSettings = (existingPref && existingPref.settings) || {};
 
-    await supabase.from("preferences").upsert({
-      user_id: student.id,
-      settings: {
-        google_access_token: tokens.access_token,
-        google_refresh_token: tokens.refresh_token,
-        google_calendar_connected: true,
-        google_token_expiry: tokens.expiry_date
-          ? new Date(tokens.expiry_date).toISOString()
-          : null,
+    await supabase.from("preferences").upsert(
+      {
+        user_id: student.id,
+        settings: {
+          ...existingSettings,
+          google_access_token: tokens.access_token,
+          google_refresh_token: tokens.refresh_token || existingSettings.google_refresh_token,
+          google_calendar_connected: true,
+          google_token_expiry: tokens.expiry_date
+            ? new Date(tokens.expiry_date).toISOString()
+            : null,
+        },
       },
-    });
-
-    const appToken = jwt.sign(
-      { id: student.id, email: student.email },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
+      { onConflict: "user_id" }
     );
 
-    const userData = encodeURIComponent(JSON.stringify(student));
-
-    res.redirect(`${FRONTEND_URL}/login?token=${appToken}&user=${userData}`);
+    res.redirect(`${FRONTEND_URL}/dashboard/settings?calendar=connected`);
   } catch (error) {
-    console.error("Google OAuth error:", error);
-    res.redirect(`${FRONTEND_URL}/login?error=google_auth_failed`);
+    console.error("Google Calendar OAuth error:", error);
+    res.redirect(`${FRONTEND_URL}/dashboard/settings?calendar_error=oauth_failed`);
   }
 });
 

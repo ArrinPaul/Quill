@@ -2,7 +2,7 @@
 import { toast } from 'sonner';
 
 import { useEffect, useState } from "react";
-import { Calendar, Loading01 as Loader2, Plus, Save01 as Save, Settings01 as Settings, Shield02 as ShieldAlert, ShieldTick as ShieldCheck, Stars01 as Sparkles, User01 as User, XClose as X } from "@untitledui/icons";
+import { Calendar, Key01 as Key, Loading01 as Loader2, Plus, Save01 as Save, Settings01 as Settings, Shield02 as ShieldAlert, ShieldTick as ShieldCheck, Stars01 as Sparkles, User01 as User, XClose as X } from "@untitledui/icons";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -27,6 +27,22 @@ export default function SettingsPage() {
 
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+
+  // Change password states
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("calendar") === "connected") {
+      setSuccessMsg("Google Calendar connected successfully!");
+      toast.success("Google Calendar connected!");
+    } else if (params.get("calendar_error")) {
+      setError("Failed to connect Google Calendar. Please try again.");
+    }
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -100,6 +116,44 @@ export default function SettingsPage() {
       setError(err instanceof Error ? err.message : "Failed to update profile details");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setSuccessMsg("");
+
+    if (!currentPassword || !newPassword) {
+      setError("Please enter your current and new password");
+      return;
+    }
+    if (newPassword.length < 6) {
+      setError("New password must be at least 6 characters");
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      setError("New passwords do not match");
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      await api.put("/api/auth/password", {
+        currentPassword,
+        newPassword,
+      });
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmNewPassword("");
+      setSuccessMsg("Password updated successfully!");
+      toast.success("Password updated successfully!");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to update password";
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setChangingPassword(false);
     }
   };
 
@@ -313,6 +367,79 @@ export default function SettingsPage() {
                       <Save className="w-4 h-4" />
                       Save Profile Changes
                     </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Change Password Card */}
+          <div className="bg-white border border-border rounded-[10px] p-6 shadow-sm space-y-4">
+            <h3 className="font-semibold text-foreground text-base flex items-center gap-2 border-b border-border pb-3">
+              <Key className="w-4 h-4 text-primary" />
+              Change Password
+            </h3>
+
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <div>
+                <label htmlFor="current-password" className="block text-xs font-semibold text-foreground mb-1.5 uppercase tracking-wider">
+                  Current Password
+                </label>
+                <input
+                  id="current-password"
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  className="w-full px-3 py-2 border border-border rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  placeholder="••••••••"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="new-password-settings" className="block text-xs font-semibold text-foreground mb-1.5 uppercase tracking-wider">
+                    New Password
+                  </label>
+                  <input
+                    id="new-password-settings"
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full px-3 py-2 border border-border rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    placeholder="At least 6 characters"
+                    required
+                  />
+                </div>
+                <div>
+                  <label htmlFor="confirm-new-password-settings" className="block text-xs font-semibold text-foreground mb-1.5 uppercase tracking-wider">
+                    Confirm New Password
+                  </label>
+                  <input
+                    id="confirm-new-password-settings"
+                    type="password"
+                    value={confirmNewPassword}
+                    onChange={(e) => setConfirmNewPassword(e.target.value)}
+                    className="w-full px-3 py-2 border border-border rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    placeholder="Repeat new password"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <button
+                  type="submit"
+                  disabled={changingPassword}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground text-sm font-semibold rounded-[10px] hover:opacity-90 transition-standard cursor-pointer disabled:opacity-50"
+                >
+                  {changingPassword ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    "Update Password"
                   )}
                 </button>
               </div>

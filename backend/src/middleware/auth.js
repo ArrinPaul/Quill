@@ -17,7 +17,6 @@ function authMiddleware(req, res, next) {
       email: "dev@example.com",
       branch: "Computer Science",
       year: 4,
-      telegram_username: "dev_user",
       subjects: ["CS101", "CS102"],
       created_at: new Date().toISOString()
     };

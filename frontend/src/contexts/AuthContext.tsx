@@ -10,7 +10,6 @@ export interface User {
   email: string;
   branch: string;
   year: number;
-  telegram_username: string;
   subjects: string[];
   created_at: string;
 }
@@ -21,7 +20,6 @@ export interface RegisterPayload {
   password: string;
   branch: string;
   year: number;
-  telegram_username?: string;
   subjects?: string[];
 }
 
