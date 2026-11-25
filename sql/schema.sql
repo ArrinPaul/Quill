@@ -7,7 +7,6 @@ CREATE TABLE public.students (
   branch TEXT NOT NULL,
   year INTEGER NOT NULL,
   subjects TEXT[] NOT NULL DEFAULT '{}',
-  telegram_username TEXT NOT NULL,
   email TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
@@ -24,7 +23,6 @@ CREATE TABLE public.tasks (
   reminder_time TIMESTAMPTZ,
   add_to_calendar BOOLEAN DEFAULT TRUE,
   status TEXT CHECK (status IN ('pending','completed','cancelled')) DEFAULT 'pending',
-  n8n_triggered BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -36,7 +34,6 @@ CREATE TABLE public.notices (
   ai_summary TEXT,
   event_date DATE,
   event_title TEXT,
-  broadcast_status TEXT CHECK (broadcast_status IN ('pending','sent','failed')) DEFAULT 'pending',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -49,16 +46,6 @@ CREATE TABLE public.attendance (
   attended_classes INTEGER NOT NULL DEFAULT 0,
   threshold NUMERIC DEFAULT 75.0,
   updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Automation Logs
-CREATE TABLE public.automation_logs (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  student_id UUID REFERENCES public.students(id) ON DELETE CASCADE,
-  workflow_type TEXT CHECK (workflow_type IN ('deadline_reminder','notice_broadcast','attendance_alert')) NOT NULL,
-  status TEXT CHECK (status IN ('triggered','success','failed')) DEFAULT 'triggered',
-  details JSONB,
-  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- User Preferences
@@ -75,7 +62,6 @@ CREATE INDEX idx_tasks_student_id ON public.tasks(student_id);
 CREATE INDEX idx_tasks_deadline ON public.tasks(deadline);
 CREATE INDEX idx_notices_student_id ON public.notices(student_id);
 CREATE INDEX idx_attendance_student_id ON public.attendance(student_id);
-CREATE INDEX idx_automation_logs_student_id ON public.automation_logs(student_id);
 
 -- Whiteboards
 CREATE TABLE public.whiteboards (

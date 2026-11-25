@@ -1,30 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Announcement01 as Megaphone, Bell01 as Bell, Calendar, Clock, Loading01 as Loader2, RefreshCcw01 as RefreshCw, Send01 as Send, Stars01 as Sparkles, Users01 as Users } from "@untitledui/icons";
+import { Announcement01 as Megaphone, Calendar, Loading01 as Loader2, RefreshCcw01 as RefreshCw, Stars01 as Sparkles } from "@untitledui/icons";
 import { api } from "@/lib/api";
 import { motion } from "framer-motion";
 import type { Notice } from "@/features/types";
 
-interface GroupEvent {
-  id: string;
-  group_id: string;
-  title: string;
-  event_date: string;
-  priority: string;
-  category: string;
-  raw_message: string;
-  created_at: string;
-  telegram_groups?: { name: string };
-}
-
 type TimelineFilter = "upcoming" | "previous" | "all";
 
 export default function NoticesPage() {
-  const [viewMode, setViewMode] = useState<"group" | "personal">("group");
   const [timelineFilter, setTimelineFilter] = useState<TimelineFilter>("upcoming");
   const [notices, setNotices] = useState<Notice[]>([]);
-  const [groupEvents, setGroupEvents] = useState<GroupEvent[]>([]);
   const [loading, setLoading] = useState(true);
   
   // Form input states
@@ -34,27 +20,22 @@ export default function NoticesPage() {
   
   // Status states
   const [summarizing, setSummarizing] = useState(false);
-  const [broadcastingId, setBroadcastingId] = useState<string | null>(null);
   const [activeNotice, setActiveNotice] = useState<Notice | null>(null);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
   const fetchNotices = async (showLoading = true) => {
     if (showLoading) setLoading(true);
+    setError("");
     try {
-      const [noticesRes, eventsRes] = await Promise.all([
-        api.get<{ notices: Notice[] }>("/api/notices").catch(() => ({ notices: [] })),
-        api.get<{ events: GroupEvent[] }>("/api/groups/events").catch(() => ({ events: [] }))
-      ]);
+      const noticesRes = await api.get<{ notices: Notice[] }>("/api/notices");
       setNotices(noticesRes.notices || []);
-      setGroupEvents(eventsRes.events || []);
       
       if (noticesRes.notices && noticesRes.notices.length > 0 && !activeNotice) {
-        // Default to showing the latest personal notice if none selected
         setActiveNotice(noticesRes.notices[0]);
       }
     } catch (err) {
-      console.error("Failed to fetch notices", err);
+      setError(err instanceof Error ? err.message : "Failed to load notices");
     } finally {
       setLoading(false);
     }
@@ -95,54 +76,13 @@ export default function NoticesPage() {
     }
   };
 
-  const handleBroadcast = async (noticeId: string) => {
-    setError("");
-    setSuccessMsg("");
-    setBroadcastingId(noticeId);
-    
-    try {
-      const res = await api.post<{ success: boolean }>("/api/notices/broadcast", {
-        notice_id: noticeId
-      });
-      
-      if (res.success) {
-        setSuccessMsg("Broadcast sent to Telegram bot successfully!");
-        // Update local broadcast status
-        setNotices((prev) => 
-          prev.map((n) => n.id === noticeId ? { ...n, broadcast_status: "sent" } : n)
-        );
-        if (activeNotice && activeNotice.id === noticeId) {
-          setActiveNotice({ ...activeNotice, broadcast_status: "sent" });
-        }
-      } else {
-        setError("n8n notice broadcast failed to deliver");
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to broadcast notice");
-    } finally {
-      setBroadcastingId(null);
-    }
-  };
-
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-
-  const isEventUpcoming = (eventDateStr: string) => {
-    const d = new Date(eventDateStr);
-    return d >= today;
-  };
 
   const isNoticeUpcoming = (eventDateStr: string | null, createdAtStr: string) => {
     const d = new Date(eventDateStr || createdAtStr);
     return d >= today;
   };
-
-  const filteredGroupEvents = groupEvents.filter((event) => {
-    if (timelineFilter === "all") return true;
-    if (timelineFilter === "upcoming") return isEventUpcoming(event.event_date);
-    if (timelineFilter === "previous") return !isEventUpcoming(event.event_date);
-    return true;
-  });
 
   const filteredNotices = notices.filter((notice) => {
     if (timelineFilter === "all") return true;
@@ -152,23 +92,9 @@ export default function NoticesPage() {
   });
 
   return (
-    <div className="max-w-7xl mx-auto h-[calc(100vh-6rem)] flex flex-col">
+    <div className="max-w-7xl mx-auto min-h-[calc(100vh-6rem)] flex flex-col">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 flex-shrink-0 mb-6">
-        <h1 className="text-2xl font-bold text-foreground">Announcements</h1>
-        <div className="flex bg-muted/40 p-1 rounded-[10px] w-full sm:max-w-sm">
-          <button 
-            onClick={() => setViewMode("group")} 
-            className={`flex-1 text-sm font-medium py-1.5 rounded-[8px] transition-standard flex items-center justify-center gap-2 ${viewMode === "group" ? "bg-white shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-          >
-            <Users className="w-4 h-4" /> Group
-          </button>
-          <button 
-            onClick={() => setViewMode("personal")} 
-            className={`flex-1 text-sm font-medium py-1.5 rounded-[8px] transition-standard flex items-center justify-center gap-2 ${viewMode === "personal" ? "bg-white shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-          >
-            <Sparkles className="w-4 h-4" /> Summarizer
-          </button>
-        </div>
+        <h1 className="text-2xl font-bold text-foreground">Notices &amp; Summarizer</h1>
       </div>
 
       {/* Filter Tabs matching the exact Design System of /tasks */}
@@ -210,53 +136,7 @@ export default function NoticesPage() {
         </div>
       )}
 
-      {viewMode === "group" ? (
-        <div className="flex-1 overflow-y-auto pr-1 space-y-4 pb-6">
-          {loading ? (
-            <div className="flex flex-col items-center justify-center py-20">
-              <Loader2 className="w-6 h-6 text-primary animate-spin mb-2" />
-              <p className="text-sm text-muted-foreground">Loading announcements...</p>
-            </div>
-          ) : filteredGroupEvents.length === 0 ? (
-            <div className="bg-white border border-border rounded-[10px] p-12 text-center shadow-sm">
-              <Bell className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-foreground mb-2">
-                {timelineFilter === "upcoming"
-                  ? "No Upcoming Announcements"
-                  : timelineFilter === "previous"
-                  ? "No Previous Announcements"
-                  : "No Group Announcements"}
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                {timelineFilter === "all"
-                  ? "Join a group via invite link to receive teacher announcements here."
-                  : `No announcements found under the ${timelineFilter} category.`}
-              </p>
-            </div>
-          ) : (
-            filteredGroupEvents.map(event => (
-              <div key={event.id} className="bg-white border border-border rounded-[10px] p-5 shadow-sm space-y-3 relative overflow-hidden group">
-                <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium px-2 py-1 bg-primary/10 text-primary rounded-full inline-flex items-center gap-1.5">
-                    <Users className="w-3 h-3" />
-                    {event.telegram_groups?.name || "Unknown Group"}
-                  </span>
-                  <span className="text-xs text-muted-foreground font-mono">{new Date(event.created_at).toLocaleDateString()}</span>
-                </div>
-                <h3 className="font-bold text-foreground text-lg">{event.title}</h3>
-                <p className="text-sm text-muted-foreground whitespace-pre-line leading-relaxed">{event.raw_message}</p>
-                <div className="flex items-center gap-4 text-xs font-medium pt-3 border-t border-border mt-3">
-                  <div className="flex items-center gap-1.5 text-secondary"><Calendar className="w-3.5 h-3.5"/> Due: {new Date(event.event_date).toLocaleDateString()}</div>
-                  <div className="flex items-center gap-1.5 text-amber-600"><Megaphone className="w-3.5 h-3.5"/> {event.priority} Priority</div>
-                  <div className="flex items-center gap-1.5 text-purple-600"><Clock className="w-3.5 h-3.5"/> {event.category}</div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0 overflow-y-auto pb-6 pr-1">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0 overflow-y-auto pb-6 pr-1">
         {/* Notice Form Input */}
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-white/60 backdrop-blur-xl border border-white/40 rounded-[24px] p-6 shadow-sm space-y-5 relative overflow-hidden">
@@ -326,7 +206,7 @@ export default function NoticesPage() {
           {/* Active Notice Summary View */}
           {activeNotice && (
             <div className="bg-gradient-to-br from-white/90 to-white/50 backdrop-blur-xl border border-white/40 rounded-[24px] p-6 shadow-sm space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="flex justify-between items-start gap-4">
+              <div className="flex flex-wrap justify-between items-start gap-4">
                 <div>
                   <h3 className="font-bold text-foreground text-xl flex items-center gap-2">
                     <Sparkles className="w-5 h-5 text-primary" />
@@ -336,18 +216,6 @@ export default function NoticesPage() {
                     Created on {new Date(activeNotice.created_at).toLocaleString()}
                   </p>
                 </div>
-                <button
-                  onClick={() => handleBroadcast(activeNotice.id)}
-                  disabled={broadcastingId === activeNotice.id}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-foreground text-background font-semibold rounded-[12px] hover:bg-primary transition-all cursor-pointer disabled:opacity-50 shadow-sm"
-                >
-                  {broadcastingId === activeNotice.id ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Send className="w-4 h-4" />
-                  )}
-                  {activeNotice.broadcast_status === "sent" ? "Re-Broadcast" : "Broadcast (TG)"}
-                </button>
               </div>
 
               <div className="p-5 bg-white/80 border border-black/5 rounded-[16px] text-sm text-foreground space-y-2 whitespace-pre-line leading-relaxed shadow-sm">
@@ -384,6 +252,9 @@ export default function NoticesPage() {
               Recent Notices
             </h3>
             <button 
+              type="button"
+              aria-label="Refresh notices"
+              title="Refresh notices"
               onClick={() => fetchNotices(false)}
               className="p-2 hover:bg-black/5 rounded-full text-muted-foreground hover:text-foreground transition-all cursor-pointer"
             >
@@ -448,7 +319,6 @@ export default function NoticesPage() {
           )}
         </div>
       </div>
-      )}
     </div>
   );
 }

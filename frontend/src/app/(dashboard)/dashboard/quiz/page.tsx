@@ -533,10 +533,15 @@ export default function QuizPage() {
                         }
 
                         return (
-                          <div key={optIdx} onClick={() => handleSelectOption(optIdx)} className={cardStyle}>
+                          <button
+                            key={optIdx}
+                            type="button"
+                            onClick={() => handleSelectOption(optIdx)}
+                            className={`${cardStyle} w-full text-left`}
+                          >
                             <span className={letterBadgeStyle}>{optionLetter}</span>
                             <span className="font-sans">{option}</span>
-                          </div>
+                          </button>
                         );
                       })}
                     </div>

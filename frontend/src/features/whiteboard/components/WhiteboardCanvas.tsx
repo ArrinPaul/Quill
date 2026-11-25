@@ -100,6 +100,8 @@ export function WhiteboardCanvas({ whiteboardId, title, onBack }: WhiteboardCanv
         <div className="flex items-center gap-3">
           {onBack && (
             <button
+              type="button"
+              aria-label="Back to whiteboards list"
               onClick={onBack}
               className="p-1.5 hover:bg-muted rounded-[8px] transition-colors cursor-pointer text-muted-foreground hover:text-foreground"
               title="Back to List"
@@ -223,13 +225,15 @@ export function WhiteboardCanvas({ whiteboardId, title, onBack }: WhiteboardCanv
             </div>
           )}
 
-          {/* Minimap Overlay component */}
-          <Minimap
-            shapes={engine.shapes}
-            viewport={engine.viewport}
-            onSetViewport={engine.setViewport}
-            parentCanvas={engine.canvasRef.current}
-          />
+          {/* Minimap Overlay component (hidden on small screens to avoid crowding status bar) */}
+          <div className="hidden sm:block">
+            <Minimap
+              shapes={engine.shapes}
+              viewport={engine.viewport}
+              onSetViewport={engine.setViewport}
+              parentCanvas={engine.canvasRef.current}
+            />
+          </div>
 
           {/* Status info bar */}
           <div className="absolute bottom-2 left-2 flex gap-3 text-xs text-muted-foreground bg-white/80 px-2 py-1 rounded border border-border/50 pointer-events-none font-medium">
@@ -240,6 +244,8 @@ export function WhiteboardCanvas({ whiteboardId, title, onBack }: WhiteboardCanv
 
           {/* Absolute positioned Layers toggle button */}
           <button
+            type="button"
+            aria-label="Toggle Layers"
             onClick={() => setLayersOpen(!layersOpen)}
             className={`absolute bottom-2 right-2 z-20 p-2 rounded-full border shadow-sm transition-all cursor-pointer ${
               layersOpen

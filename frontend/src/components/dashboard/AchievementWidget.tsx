@@ -84,13 +84,15 @@ export function AchievementWidget({ isExpanded }: AchievementWidgetProps) {
   }
 
   const { level, title, currentLevelXp, maxXp, badges } = data;
-  const xpPercent = Math.min((currentLevelXp / maxXp) * 100, 100);
+  const xpPercent = maxXp > 0 ? Math.min((currentLevelXp / maxXp) * 100, 100) : 0;
 
   // Normal view: prioritize unearned badges close to completion (sort by progress/target descending)
   const sortedBadges = [...badges].sort((a, b) => {
     if (a.earned && !b.earned) return -1;
     if (!a.earned && b.earned) return 1;
-    return (b.progress / b.target) - (a.progress / a.target);
+    const ratioA = a.target > 0 ? a.progress / a.target : 0;
+    const ratioB = b.target > 0 ? b.progress / b.target : 0;
+    return ratioB - ratioA;
   });
 
   const displayBadges = sortedBadges.slice(0, 4);
@@ -125,7 +127,7 @@ export function AchievementWidget({ isExpanded }: AchievementWidgetProps) {
           {badges.map((badge) => {
             const Icon = getBadgeIcon(badge.id);
             const isEarned = badge.earned;
-            const progressPct = Math.min((badge.progress / badge.target) * 100, 100);
+            const progressPct = badge.target > 0 ? Math.min((badge.progress / badge.target) * 100, 100) : 0;
 
             return (
               <div

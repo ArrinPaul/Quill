@@ -277,6 +277,8 @@ export default function TasksPage() {
             >
               {/* Status toggle button */}
               <button
+                type="button"
+                aria-label={task.status === "completed" ? `Mark ${task.title} as pending` : `Mark ${task.title} as completed`}
                 onClick={() => handleToggleStatus(task)}
                 className={`w-6 h-6 rounded-full border flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors cursor-pointer ${
                   task.status === "completed"
@@ -289,8 +291,8 @@ export default function TasksPage() {
 
               <div className="flex-1 min-w-0 space-y-1">
                 <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <h3 className={`text-base font-semibold text-foreground ${task.status === "completed" ? "line-through text-muted-foreground" : ""}`}>
+                  <div className="min-w-0 flex-1">
+                    <h3 className={`text-base font-semibold text-foreground break-words ${task.status === "completed" ? "line-through text-muted-foreground" : ""}`}>
                       {task.title}
                     </h3>
                     <span className="inline-block px-2 py-0.5 text-xs font-semibold bg-muted text-muted-foreground rounded-[10px] mt-1">
@@ -369,8 +371,16 @@ export default function TasksPage() {
 
       {/* Task Form Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-in fade-in zoom-in-95 duration-200">
-          <div className="bg-white rounded-[24px] border border-black/5 shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto overflow-x-hidden flex flex-col relative">
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-in fade-in zoom-in-95 duration-200"
+          onClick={() => setIsModalOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="bg-white rounded-[24px] border border-black/5 shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto overflow-x-hidden flex flex-col relative"
+            onClick={(e) => e.stopPropagation()}
+          >
             
             {/* Header */}
             <div className="flex items-center justify-between p-6 pb-4 border-b border-black/5 bg-gradient-to-r from-primary/5 to-transparent">
@@ -383,6 +393,8 @@ export default function TasksPage() {
                 </p>
               </div>
               <button 
+                type="button"
+                aria-label="Close task modal"
                 onClick={() => setIsModalOpen(false)}
                 className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-black/5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
               >

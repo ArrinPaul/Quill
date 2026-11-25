@@ -27,6 +27,8 @@ export default function SettingsPage() {
 
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   // Change password states
   const [currentPassword, setCurrentPassword] = useState("");
@@ -337,6 +339,12 @@ export default function SettingsPage() {
                     type="text"
                     value={newSubject}
                     onChange={(e) => setNewSubject(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAddSubject(e);
+                      }
+                    }}
                     placeholder="e.g., DBMS"
                     className="flex-1 px-3 py-1.5 border border-border rounded-[10px] text-xs focus:outline-none focus:ring-2 focus:ring-ring"
                   />
@@ -460,17 +468,8 @@ export default function SettingsPage() {
               </div>
               <button
                 type="button"
-                onClick={async () => {
-                  if (confirm("Are you absolutely sure you want to delete your account? This action cannot be undone.")) {
-                    try {
-                      await api.delete("/api/auth/me");
-                      logout();
-                    } catch (err) {
-                      toast.error("Failed to delete account: " + (err instanceof Error ? err.message : "Unknown error"));
-                    }
-                  }
-                }}
-                className="shrink-0 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-[10px] hover:bg-red-700 transition-colors"
+                onClick={() => setShowDeleteConfirm(true)}
+                className="shrink-0 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-[10px] hover:bg-red-700 transition-colors cursor-pointer"
               >
                 Delete Account
               </button>
@@ -478,6 +477,55 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
+
+      {showDeleteConfirm && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200"
+          onClick={() => !deletingAccount && setShowDeleteConfirm(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-account-title"
+            className="bg-white rounded-[12px] border border-border shadow-2xl max-w-md w-full p-6 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="delete-account-title" className="text-lg font-bold text-foreground">
+              Delete Account Permanently?
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              This will permanently wipe your tasks, attendance records, notices, flashcards, quizzes, and profile. This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                disabled={deletingAccount}
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2 border border-border rounded-[10px] text-sm font-medium text-muted-foreground hover:bg-muted transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deletingAccount}
+                onClick={async () => {
+                  setDeletingAccount(true);
+                  try {
+                    await api.delete("/api/auth/me");
+                    logout();
+                  } catch (err) {
+                    toast.error("Failed to delete account: " + (err instanceof Error ? err.message : "Unknown error"));
+                    setDeletingAccount(false);
+                  }
+                }}
+                className="px-4 py-2 bg-red-600 text-white rounded-[10px] text-sm font-semibold hover:bg-red-700 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {deletingAccount ? "Deleting..." : "Yes, Delete Account"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

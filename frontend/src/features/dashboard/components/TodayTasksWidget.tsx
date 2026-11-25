@@ -41,7 +41,7 @@ export function TodayTasksWidget({ tasks = [] }: TodayTasksWidgetProps) {
           <h3 className="font-semibold text-foreground">Today&apos;s Tasks</h3>
         </div>
         {todayTasks.length > 0 && (
-          <Link href="/dashboard/tasks" className="text-xs text-primary hover:text-primary/80 font-medium flex items-center gap-1 transition-colors">
+          <Link href="/dashboard/tasks" onClick={(e) => e.stopPropagation()} className="text-xs text-primary hover:text-primary/80 font-medium flex items-center gap-1 transition-colors">
             View All <ArrowRight className="w-3 h-3" />
           </Link>
         )}
@@ -56,6 +56,7 @@ export function TodayTasksWidget({ tasks = [] }: TodayTasksWidgetProps) {
           <p className="text-xs text-muted-foreground mb-4">Enjoy your free day!</p>
           <Link
             href="/dashboard/tasks"
+            onClick={(e) => e.stopPropagation()}
             className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-white text-xs font-medium rounded-[10px] hover:bg-primary/90 transition-all"
           >
             <Plus className="w-3.5 h-3.5" /> Add Task
@@ -85,12 +86,14 @@ export function TodayTasksWidget({ tasks = [] }: TodayTasksWidgetProps) {
                   href={generateGoogleCalendarUrl(task.title, task.description || "", task.deadline)}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
                   className="p-1 hover:bg-blue-50 rounded-md text-muted-foreground hover:text-blue-600 transition-colors"
                   title="Add to Google Calendar"
+                  aria-label={`Add ${task.title} to Google Calendar`}
                 >
                   <Calendar className="w-4 h-4" />
                 </a>
-                <span className="px-2.5 py-1 text-xs font-medium bg-primary/10 text-primary rounded-[10px] whitespace-nowrap">
+                <span className="px-2.5 py-1 text-xs font-medium bg-primary/10 text-primary rounded-[10px] whitespace-nowrap capitalize">
                   {task.status}
                 </span>
               </div>

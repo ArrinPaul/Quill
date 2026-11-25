@@ -57,6 +57,15 @@ export default function AttendancePage() {
       setAiAlerts((prev) => ({ ...prev, [record.id]: alertData }));
     } catch (err) {
       console.error(`Failed to assess risk for ${record.subject}`, err);
+      const pct = record.total_classes > 0 ? Math.round((record.attended_classes / record.total_classes) * 100) : 0;
+      setAiAlerts((prev) => ({
+        ...prev,
+        [record.id]: {
+          percentage: String(pct),
+          isAtRisk: pct < record.threshold,
+          message: "Unable to load AI risk analysis right now. Click refresh to retry.",
+        },
+      }));
     }
   };
 
@@ -373,6 +382,8 @@ export default function AttendancePage() {
 
                     <div className="flex sm:flex-col items-center justify-start gap-2 flex-shrink-0 w-full sm:w-auto mt-2 sm:mt-0 border-t sm:border-t-0 sm:border-l border-black/5 pt-3 sm:pt-0 sm:pl-3">
                       <button
+                        type="button"
+                        aria-label={`Recheck risk assessment for ${record.subject}`}
                         onClick={() => handleRefreshAlert(record)}
                         disabled={analyzingId === record.id}
                         className="p-2 w-full sm:w-auto hover:bg-black/5 rounded-[12px] text-muted-foreground hover:text-foreground transition-all cursor-pointer flex items-center justify-center"
@@ -381,6 +392,8 @@ export default function AttendancePage() {
                         <RefreshCw className={`w-4.5 h-4.5 ${analyzingId === record.id ? "animate-spin" : ""}`} />
                       </button>
                       <button
+                        type="button"
+                        aria-label={`Delete ${record.subject} attendance`}
                         onClick={() => handleDelete(record.id)}
                         className="p-2 w-full sm:w-auto hover:bg-destructive/10 rounded-[12px] text-muted-foreground hover:text-destructive transition-all cursor-pointer flex items-center justify-center"
                         title="Delete subject record"

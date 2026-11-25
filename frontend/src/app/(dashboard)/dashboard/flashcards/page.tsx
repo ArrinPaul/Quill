@@ -65,25 +65,22 @@ export default function FlashcardsPage() {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
 
-  // Fetch decks from backend
+  // Fetch decks from backend on mount
   useEffect(() => {
     async function fetchDecks() {
       try {
         const res = await api.get<{ decks: Deck[] }>("/api/flashcards/decks");
         if (res.decks && res.decks.length > 0) {
           setDecks(res.decks);
-          // Auto-select first deck if none selected
-          if (!selectedDeckId) {
-            setSelectedDeckId(res.decks[0].id);
-            setFlashcards(res.decks[0].flashcards || []);
-          }
+          setSelectedDeckId(res.decks[0].id);
+          setFlashcards(res.decks[0].flashcards || []);
         }
       } catch (err) {
         console.error("Failed to fetch decks:", err);
       }
     }
     fetchDecks();
-  }, [selectedDeckId]);
+  }, []);
 
   // PDF.js dynamic CDN Loader helper
   const loadPdfJs = async () => {
@@ -416,14 +413,14 @@ export default function FlashcardsPage() {
     <div className="max-w-7xl mx-auto h-[calc(100vh-6rem)] flex flex-col">
       
       {/* Header */}
-      <div className="flex items-center justify-between flex-shrink-0 mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 flex-shrink-0 mb-6">
         <h1 className="text-2xl font-bold text-foreground">
           Flashcards
         </h1>
 
         {/* Global actions */}
         {flashcards.length > 0 && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => setShowAddCardInline(!showAddCardInline)}
               className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground font-medium rounded-[10px] hover:opacity-90 transition-standard cursor-pointer"
@@ -995,20 +992,26 @@ export default function FlashcardsPage() {
                     <div className="bg-white border border-border rounded-[10px] overflow-hidden divide-y divide-[#e0d4f0] shadow-sm">
                       {flashcards.map((card, idx) => (
                         <div key={idx} className="p-5 hover:bg-background transition-standard space-y-2.5 relative group">
-                          <div className="absolute right-4 top-4 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-standard">
+                          <div className="absolute right-4 top-4 flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-standard">
                             <button
+                              type="button"
+                              aria-label="Edit flashcard"
                               onClick={(e) => handleStartEditCard(card, e)}
                               className="p-1.5 text-muted-foreground hover:text-primary hover:bg-card rounded-[10px] transition-standard cursor-pointer"
                             >
                               <Edit2 className="w-3.5 h-3.5" />
                             </button>
                             <button
+                              type="button"
+                              aria-label="Copy flashcard"
                               onClick={(e) => handleCopyCard(idx, e)}
                               className="p-1.5 text-muted-foreground hover:text-primary hover:bg-card rounded-[10px] transition-standard cursor-pointer"
                             >
                               {copiedIndex === idx ? <Check className="w-3.5 h-3.5 text-purple-700" /> : <Copy className="w-3.5 h-3.5" />}
                             </button>
                             <button
+                              type="button"
+                              aria-label="Delete flashcard"
                               onClick={(e) => handleDeleteCard(card.id, e)}
                               className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-[10px] transition-standard cursor-pointer"
                             >

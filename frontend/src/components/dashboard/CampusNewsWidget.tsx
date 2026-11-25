@@ -51,62 +51,42 @@ function getPriorityRank(priorityStr?: string | null): number {
 export function CampusNewsWidget({ isExpanded = false }: CampusNewsWidgetProps) {
   const [news, setNews] = useState<UnifiedNews[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
-    Promise.all([
-      api.get<{ notices: Notice[] }>("/api/notices").catch(() => ({ notices: [] })),
-      api.get<{ events: GroupEvent[] }>("/api/groups/events").catch(() => ({ events: [] }))
-    ]).then(([noticesRes, eventsRes]) => {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+    api
+      .get<{ notices: Notice[] }>("/api/notices")
+      .then((noticesRes) => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
 
-      const formattedNotices: UnifiedNews[] = (noticesRes.notices || []).map((n) => {
-        const deadline = n.event_date || n.created_at;
-        return {
-          id: n.id,
-          type: "notice",
-          title: n.event_title || "Personal Notice",
-          summary: n.ai_summary || n.notice_text,
-          date: n.created_at,
-          deadlineDate: deadline,
-          priorityRank: 0,
-          iconType: n.ai_summary ? "ai" : "calendar"
-        };
-      });
+        const formattedNotices: UnifiedNews[] = (noticesRes.notices || []).map((n) => {
+          const deadline = n.event_date || n.created_at;
+          return {
+            id: n.id,
+            type: "notice",
+            title: n.event_title || "Personal Notice",
+            summary: n.ai_summary || n.notice_text,
+            date: n.created_at,
+            deadlineDate: deadline,
+            priorityRank: 0,
+            iconType: n.ai_summary ? "ai" : "calendar",
+          };
+        });
 
-      const formattedEvents: UnifiedNews[] = (eventsRes.events || []).map((e) => {
-        const deadline = e.event_date || e.created_at;
-        return {
-          id: e.id,
-          type: "event",
-          title: e.telegram_groups?.name ? `Group: ${e.telegram_groups.name}` : "Group Event",
-          summary: e.title || e.raw_message,
-          date: e.created_at,
-          deadlineDate: deadline,
-          priorityRank: getPriorityRank(e.priority),
-          priorityLabel: e.priority,
-          iconType: "group"
-        };
-      });
+        const upcomingItems = formattedNotices.filter((item) => {
+          const itemDate = new Date(item.deadlineDate);
+          return itemDate >= today;
+        });
 
-      // Filter to ONLY upcoming notices & events
-      const upcomingItems = [...formattedNotices, ...formattedEvents].filter((item) => {
-        const itemDate = new Date(item.deadlineDate);
-        return itemDate >= today;
-      });
+        upcomingItems.sort(
+          (a, b) => new Date(a.deadlineDate).getTime() - new Date(b.deadlineDate).getTime()
+        );
 
-      // Sort strictly by:
-      // 1. Highest Priority first
-      // 2. Earliest deadline/date first (closest upcoming)
-      upcomingItems.sort((a, b) => {
-        if (b.priorityRank !== a.priorityRank) {
-          return b.priorityRank - a.priorityRank;
-        }
-        return new Date(a.deadlineDate).getTime() - new Date(b.deadlineDate).getTime();
-      });
-
-      setNews(upcomingItems);
-    }).finally(() => setLoading(false));
+        setNews(upcomingItems);
+      })
+      .catch(() => setError(true))
+      .finally(() => setLoading(false));
   }, []);
 
   if (loading) {
@@ -139,7 +119,12 @@ export function CampusNewsWidget({ isExpanded = false }: CampusNewsWidgetProps) 
         )}
       </div>
 
-      {news.length === 0 ? (
+      {error ? (
+        <div className="flex flex-col items-center justify-center py-8 my-auto text-center">
+          <p className="text-sm font-medium text-destructive mb-1">Could not load notices</p>
+          <p className="text-xs text-muted-foreground">Please check your connection and try again.</p>
+        </div>
+      ) : news.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-8 my-auto">
           <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mb-3">
             <Newspaper className="w-6 h-6 text-muted-foreground" />

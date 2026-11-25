@@ -45,7 +45,7 @@ export function WhiteboardList({
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto p-6">
-      <div className="flex items-center justify-between border-b border-border pb-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
         <div>
           <h2 className="text-xl font-bold text-foreground">My Whiteboards</h2>
           <p className="text-xs text-muted-foreground mt-1">Create or manage visual diagram workspaces</p>
@@ -92,11 +92,13 @@ export function WhiteboardList({
                     <FileText className="w-5 h-5" />
                   </div>
                   
-                  {/* Action buttons hover display */}
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {/* Action buttons hover display (visible on touch, hover-reveal on desktop) */}
+                  <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                     {!isRenaming && (
                       <>
                         <button
+                          type="button"
+                          aria-label={`Rename ${wb.title}`}
                           onClick={(e) => startRename(wb, e)}
                           className="p-1.5 hover:bg-muted text-muted-foreground hover:text-foreground rounded-[6px] transition-colors"
                           title="Rename"
@@ -104,6 +106,8 @@ export function WhiteboardList({
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
                         <button
+                          type="button"
+                          aria-label={`Delete ${wb.title}`}
                           onClick={(e) => {
                             e.stopPropagation();
                             onDeleteBoard(wb.id);
