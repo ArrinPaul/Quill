@@ -9,6 +9,7 @@ const DEFAULT_TIMEOUT_MS = 30_000;
 
 let groq = null;
 let customCompleter = null;
+let customStreamCompleter = null;
 let aiTimeoutMs = DEFAULT_TIMEOUT_MS;
 
 try {
@@ -31,6 +32,10 @@ function setGroqClient(client) {
 
 function setCompleter(fn) {
   customCompleter = fn || null;
+}
+
+function setStreamCompleter(fn) {
+  customStreamCompleter = fn || null;
 }
 
 function setAiTimeoutMs(ms) {
@@ -157,6 +162,107 @@ async function chatResponse(messages) {
     temperature: 0.7,
     max_tokens: 800,
   });
+}
+
+async function streamComplete(params, onDelta, { signal } = {}) {
+  if (!customStreamCompleter && !isGroqAvailable()) {
+    throw new AIError("AI is not configured on the server.");
+  }
+
+  const controller = new AbortController();
+  const onExternalAbort = () => controller.abort();
+  if (signal) {
+    if (signal.aborted) {
+      controller.abort();
+    } else {
+      signal.addEventListener("abort", onExternalAbort, { once: true });
+    }
+  }
+
+  let timedOut = false;
+  let timer;
+  const timeoutPromise = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+      reject(new AIError("The AI request timed out. Please try again."));
+    }, aiTimeoutMs);
+  });
+
+  const runStream = async () => {
+    let fullText = "";
+    const emit = (delta) => {
+      if (typeof delta === "string" && delta.length > 0) {
+        fullText += delta;
+        if (onDelta) onDelta(delta);
+      }
+    };
+
+    if (customStreamCompleter) {
+      const result = await customStreamCompleter(params, {
+        signal: controller.signal,
+        onDelta: emit,
+      });
+      if (result && typeof result[Symbol.asyncIterator] === "function") {
+        for await (const chunk of result) {
+          if (controller.signal.aborted) break;
+          emit(chunk);
+        }
+      } else if (typeof result === "string" && fullText.length === 0) {
+        emit(result);
+      }
+    } else {
+      const stream = await groq.chat.completions.create(
+        { model: "groq/compound", stream: true, ...params },
+        { signal: controller.signal }
+      );
+      for await (const chunk of stream) {
+        if (controller.signal.aborted) break;
+        const delta = chunk?.choices?.[0]?.delta?.content;
+        if (delta) emit(delta);
+      }
+    }
+
+    if (controller.signal.aborted && !timedOut) {
+      const abortErr = new Error("Aborted");
+      abortErr.name = "AbortError";
+      throw abortErr;
+    }
+
+    if (!fullText) {
+      throw new Error("Empty AI response");
+    }
+    return fullText;
+  };
+
+  try {
+    return await Promise.race([runStream(), timeoutPromise]);
+  } catch (err) {
+    if (err instanceof AIError) throw err;
+    if (err?.name === "AbortError" && !timedOut) throw err;
+    console.error("Groq stream failed:", err?.message || err);
+    throw new AIError();
+  } finally {
+    clearTimeout(timer);
+    if (signal) {
+      signal.removeEventListener("abort", onExternalAbort);
+    }
+  }
+}
+
+async function streamChatResponse(messages, onDelta, options = {}) {
+  return streamComplete(
+    {
+      messages: [
+        { role: "system", content: "You are a helpful AI study assistant named Uki. You assist college students with their homework, study planning, exam preparation, and notices clarification. Keep responses helpful, structured, and friendly." },
+        ...messages,
+      ],
+      temperature: 0.7,
+      max_tokens: 800,
+    },
+    onDelta,
+    options
+  );
 }
 
 // Prevent 413 Request Entity Too Large by truncating huge documents
@@ -485,12 +591,15 @@ module.exports = {
   AIError,
   setGroqClient,
   setCompleter,
+  setStreamCompleter,
   setAiTimeoutMs,
   complete,
+  streamComplete,
   summarizeNotice,
   getStudyTip,
   attendanceAlert,
   chatResponse,
+  streamChatResponse,
   generateFlashcards,
   generateQuiz,
   gradeShortAnswer,

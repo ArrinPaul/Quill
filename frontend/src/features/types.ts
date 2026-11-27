@@ -95,3 +95,19 @@ export interface DashboardStats {
   attendance: Attendance[];
   aiTip: string;
 }
+
+export interface AiConversation {
+  id: string;
+  student_id: string;
+  title: string;
+  updated_at: string;
+  created_at: string;
+}
+
+export interface AiMessage {
+  id: string;
+  conversation_id: string;
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
+}

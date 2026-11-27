@@ -1,4 +1,4 @@
-const { z, LIMITS, subjectSchema } = require("./common");
+const { z, LIMITS, subjectSchema, titleSchema } = require("./common");
 
 const attendanceAlertSchema = z
   .object({
@@ -118,6 +118,18 @@ const gradeShortAnswerOutputSchema = z.object({
   isCorrect: z.boolean(),
 });
 
+const createConversationSchema = z.object({
+  title: titleSchema.optional(),
+});
+
+const renameConversationSchema = z.object({
+  title: titleSchema,
+});
+
+const sendConversationMessageSchema = z.object({
+  content: z.string().trim().min(1, "Required").max(LIMITS.AI_NOTES),
+});
+
 module.exports = {
   attendanceAlertSchema,
   chatSchema,
@@ -129,4 +141,7 @@ module.exports = {
   flashcardsOutputSchema,
   getQuizOutputSchema,
   gradeShortAnswerOutputSchema,
+  createConversationSchema,
+  renameConversationSchema,
+  sendConversationMessageSchema,
 };
