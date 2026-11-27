@@ -60,6 +60,32 @@ export interface ActivityItem {
   created_at: string;
 }
 
+export type QuizType = "mcq" | "tf" | "short";
+
+export interface QuizQuestion {
+  id: string;
+  quiz_id?: string;
+  type?: QuizType;
+  question: string;
+  options: string[] | null;
+  correct_index?: number | null;
+  model_answer?: string | null;
+  user_answer_index?: number | null;
+  user_answer_text?: string | null;
+  is_correct?: boolean | null;
+  feedback?: string | null;
+  explanation?: string | null;
+  citation?: string | null;
+}
+
+export interface Quiz {
+  id: string;
+  title: string;
+  score: number | null;
+  total_questions?: number;
+  created_at?: string;
+}
+
 export interface DashboardStats {
   totalTasks: number;
   pendingTasks: number;

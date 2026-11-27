@@ -102,12 +102,16 @@ CREATE TABLE IF NOT EXISTS quizzes (
 CREATE TABLE IF NOT EXISTS quiz_questions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     quiz_id UUID NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+    type TEXT NOT NULL DEFAULT 'mcq' CHECK (type IN ('mcq', 'tf', 'short')),
     question TEXT NOT NULL,
-    options JSONB NOT NULL, -- Array of string options
-    correct_index INTEGER NOT NULL,
+    options JSONB, -- Array of string options (null for short-answer)
+    correct_index INTEGER, -- Null for short-answer
+    model_answer TEXT,
     explanation TEXT,
     user_answer_index INTEGER, -- Null until answered
+    user_answer_text TEXT,
     is_correct BOOLEAN,
+    feedback TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

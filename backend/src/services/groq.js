@@ -197,7 +197,7 @@ Return ONLY a JSON array of objects with:
 Create exactly ${count} questions.
 Do not include any markdown format, backticks, or text outside the JSON array.
 Format: [{"question": "...", "options": ["True", "False"], "correctIndex": 0, "explanation": "...", "citation": "..."}, ...]`;
-  } else if (type === "short_answer") {
+  } else if (type === "short_answer" || type === "short") {
     promptContent = `You are a quiz generator. Create open-ended short answer questions from the given notes.
 Return ONLY a JSON array of objects with:
 - "question": the question text
