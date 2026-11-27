@@ -62,7 +62,7 @@ export default function AiAssistantPage() {
         ...prev,
         {
           role: "assistant",
-          content: "Sorry, I couldn't process that message right now. Please try again in a moment."
+          content: err instanceof Error ? err.message : "Sorry, I couldn't process that message right now. Please try again in a moment."
         }
       ]);
     } finally {

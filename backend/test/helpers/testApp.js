@@ -16,8 +16,8 @@ async function startTestServer(initialData = {}) {
   const { port } = server.address();
   const baseUrl = `http://127.0.0.1:${port}`;
 
-  async function request(method, path, { token, body } = {}) {
-    const headers = {};
+  async function request(method, path, { token, body, headers: extraHeaders = {} } = {}) {
+    const headers = { ...extraHeaders };
     if (token) headers.Authorization = `Bearer ${token}`;
     if (body !== undefined) headers["Content-Type"] = "application/json";
 

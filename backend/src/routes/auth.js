@@ -4,6 +4,7 @@ const jwt = require("jsonwebtoken");
 const { getClient } = require("../services/supabase");
 const authMiddleware = require("../middleware/auth");
 const validate = require("../middleware/validate");
+const { authIpLimiter, loginEmailLimiter } = require("../middleware/rateLimit");
 const {
   checkEmailSchema,
   registerSchema,
@@ -17,7 +18,7 @@ const { isEmailConfigured, sendPasswordReset } = require("../services/email");
 
 const router = express.Router();
 
-router.post("/check-email", validate({ body: checkEmailSchema }), async (req, res, next) => {
+router.post("/check-email", authIpLimiter, validate({ body: checkEmailSchema }), async (req, res, next) => {
   try {
     const { email } = req.body;
 
@@ -38,7 +39,7 @@ router.post("/check-email", validate({ body: checkEmailSchema }), async (req, re
   }
 });
 
-router.post("/register", validate({ body: registerSchema }), async (req, res, next) => {
+router.post("/register", authIpLimiter, validate({ body: registerSchema }), async (req, res, next) => {
   try {
     const { name, email, password, branch, year, subjects } = req.body;
 
@@ -82,7 +83,7 @@ router.post("/register", validate({ body: registerSchema }), async (req, res, ne
   }
 });
 
-router.post("/login", validate({ body: loginSchema }), async (req, res, next) => {
+router.post("/login", authIpLimiter, loginEmailLimiter, validate({ body: loginSchema }), async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
@@ -187,7 +188,7 @@ router.put("/password", authMiddleware, validate({ body: changePasswordSchema })
   }
 });
 
-router.post("/forgot-password", validate({ body: forgotPasswordSchema }), async (req, res, next) => {
+router.post("/forgot-password", authIpLimiter, validate({ body: forgotPasswordSchema }), async (req, res, next) => {
   try {
     const { email } = req.body;
 
@@ -232,7 +233,7 @@ router.post("/forgot-password", validate({ body: forgotPasswordSchema }), async 
   }
 });
 
-router.post("/reset-password", validate({ body: resetPasswordSchema }), async (req, res, next) => {
+router.post("/reset-password", authIpLimiter, validate({ body: resetPasswordSchema }), async (req, res, next) => {
   try {
     const { token, newPassword } = req.body;
 

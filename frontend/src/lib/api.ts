@@ -33,8 +33,12 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
   }
 
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ message: "Something went wrong" }));
-    throw new Error(error.message || `Request failed with status ${res.status}`);
+    const fallback =
+      res.status === 429
+        ? "Too many attempts. Please try again later."
+        : "Something went wrong";
+    const error = await res.json().catch(() => ({ message: fallback }));
+    throw new Error(error.message || (res.status === 429 ? fallback : `Request failed with status ${res.status}`));
   }
 
   return res.json();

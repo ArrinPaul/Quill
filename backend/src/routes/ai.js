@@ -2,6 +2,7 @@ const express = require("express");
 const multer = require("multer");
 const authMiddleware = require("../middleware/auth");
 const validate = require("../middleware/validate");
+const { aiLimiter } = require("../middleware/rateLimit");
 const {
   attendanceAlertSchema,
   chatSchema,
@@ -32,7 +33,7 @@ function uploadDocument(req, res, next) {
   });
 }
 
-router.post("/parse-document", authMiddleware, uploadDocument, async (req, res) => {
+router.post("/parse-document", authMiddleware, aiLimiter, uploadDocument, async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: "No document provided" });
@@ -87,7 +88,7 @@ router.get("/tip", async (req, res) => {
   }
 });
 
-router.post("/attendance-alert", authMiddleware, validate({ body: attendanceAlertSchema }), async (req, res, next) => {
+router.post("/attendance-alert", authMiddleware, aiLimiter, validate({ body: attendanceAlertSchema }), async (req, res, next) => {
   try {
     const { subject, total, attended, threshold } = req.body;
     const result = await attendanceAlert(subject, total, attended, threshold);
@@ -97,7 +98,7 @@ router.post("/attendance-alert", authMiddleware, validate({ body: attendanceAler
   }
 });
 
-router.post("/chat", authMiddleware, validate({ body: chatSchema }), async (req, res, next) => {
+router.post("/chat", authMiddleware, aiLimiter, validate({ body: chatSchema }), async (req, res, next) => {
   try {
     const { messages } = req.body;
     const reply = await chatResponse(messages);
@@ -107,7 +108,7 @@ router.post("/chat", authMiddleware, validate({ body: chatSchema }), async (req,
   }
 });
 
-router.post("/flashcards", authMiddleware, validate({ body: notesSchema }), async (req, res, next) => {
+router.post("/flashcards", authMiddleware, aiLimiter, validate({ body: notesSchema }), async (req, res, next) => {
   try {
     const { notes } = req.body;
     const flashcards = await generateFlashcards(notes);
@@ -117,7 +118,7 @@ router.post("/flashcards", authMiddleware, validate({ body: notesSchema }), asyn
   }
 });
 
-router.post("/quiz", authMiddleware, validate({ body: quizGenerateSchema }), async (req, res, next) => {
+router.post("/quiz", authMiddleware, aiLimiter, validate({ body: quizGenerateSchema }), async (req, res, next) => {
   try {
     const { notes, count, type } = req.body;
     const questions = await generateQuiz(notes, count, type || "mcq");
@@ -127,7 +128,7 @@ router.post("/quiz", authMiddleware, validate({ body: quizGenerateSchema }), asy
   }
 });
 
-router.post("/grade-short-answer", authMiddleware, validate({ body: gradeShortAnswerSchema }), async (req, res, next) => {
+router.post("/grade-short-answer", authMiddleware, aiLimiter, validate({ body: gradeShortAnswerSchema }), async (req, res, next) => {
   try {
     const { question, modelAnswer, userAnswer } = req.body;
     const result = await gradeShortAnswer(question, modelAnswer, userAnswer);
@@ -137,7 +138,7 @@ router.post("/grade-short-answer", authMiddleware, validate({ body: gradeShortAn
   }
 });
 
-router.post("/tool/:toolSlug", authMiddleware, validate({ params: toolParamsSchema, body: toolBodySchema }), async (req, res, next) => {
+router.post("/tool/:toolSlug", authMiddleware, aiLimiter, validate({ params: toolParamsSchema, body: toolBodySchema }), async (req, res, next) => {
   try {
     const { toolSlug } = req.params;
     const { content, options } = req.body;
