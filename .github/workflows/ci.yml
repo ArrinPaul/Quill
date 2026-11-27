@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm test
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npx vitest run
+      - name: Lint ceiling check (max 94 errors, 64 warnings)
+        run: |
+          node -e '
+            const { spawnSync } = require("child_process");
+            const r = spawnSync("npx", ["eslint", "src", "--format", "json"], {
+              encoding: "utf8",
+              maxBuffer: 50 * 1024 * 1024,
+              shell: process.platform === "win32",
+            });
+            if (r.status !== 0 && r.status !== 1) {
+              console.error(r.stderr || "ESLint failed to run");
+              process.exit(r.status || 1);
+            }
+            const results = JSON.parse(r.stdout);
+            const errors = results.reduce((sum, f) => sum + f.errorCount, 0);
+            const warnings = results.reduce((sum, f) => sum + f.warningCount, 0);
+            console.log(`ESLint: ${errors} errors (max 94), ${warnings} warnings (max 64)`);
+            if (errors > 94 || warnings > 64) {
+              console.error("ESLint ceiling exceeded");
+              process.exit(1);
+            }
+          '
