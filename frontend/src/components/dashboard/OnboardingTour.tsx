@@ -103,7 +103,7 @@ export function OnboardingTour() {
   return (
     <button
       onClick={startTour}
-      className="fixed bottom-6 right-6 z-50 w-12 h-12 bg-primary text-white rounded-full flex items-center justify-center shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all"
+      className="fixed bottom-20 right-4 md:bottom-6 md:right-6 z-30 w-12 h-12 bg-primary text-white rounded-full flex items-center justify-center shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all"
       title="Take a Tour"
     >
       <HelpCircle className="w-6 h-6" />

@@ -14,7 +14,15 @@ const {
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB limit
 
-router.post("/parse-document", authMiddleware, upload.single("document"), async (req, res) => {
+function uploadDocument(req, res, next) {
+  upload.single("document")(req, res, (err) => {
+    if (!err) return next();
+    const tooBig = err.code === "LIMIT_FILE_SIZE";
+    res.status(tooBig ? 413 : 400).json({ message: tooBig ? "File is too large (10MB maximum)." : "Upload failed." });
+  });
+}
+
+router.post("/parse-document", authMiddleware, uploadDocument, async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: "No document provided" });
@@ -55,7 +63,7 @@ router.post("/parse-document", authMiddleware, upload.single("document"), async 
     res.json({ text });
   } catch (error) {
     console.error("Document parse error:", error);
-    res.status(500).json({ message: "Failed to parse document" });
+    res.status(422).json({ message: "Failed to parse document. The file may be damaged." });
   }
 });
 
@@ -93,7 +101,7 @@ router.post("/chat", authMiddleware, async (req, res) => {
     const reply = await chatResponse(messages);
     res.json({ reply });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(error.status || 500).json({ message: error.message });
   }
 });
 
@@ -106,7 +114,7 @@ router.post("/flashcards", authMiddleware, async (req, res) => {
     const flashcards = await generateFlashcards(notes);
     res.json({ flashcards });
   } catch (error) {
-    res.status(500).json({ message: error.message || "Failed to generate flashcards" });
+    res.status(error.status || 500).json({ message: error.message || "Failed to generate flashcards" });
   }
 });
 
@@ -119,7 +127,7 @@ router.post("/quiz", authMiddleware, async (req, res) => {
     const questions = await generateQuiz(notes, count, type || "mcq");
     res.json({ questions });
   } catch (error) {
-    res.status(500).json({ message: error.message || "Failed to generate quiz" });
+    res.status(error.status || 500).json({ message: error.message || "Failed to generate quiz" });
   }
 });
 
@@ -132,7 +140,7 @@ router.post("/grade-short-answer", authMiddleware, async (req, res) => {
     const result = await gradeShortAnswer(question, modelAnswer, userAnswer);
     res.json(result);
   } catch (error) {
-    res.status(500).json({ message: error.message || "Failed to grade short answer response" });
+    res.status(error.status || 500).json({ message: error.message || "Failed to grade short answer response" });
   }
 });
 
@@ -146,7 +154,7 @@ router.post("/tool/:toolSlug", authMiddleware, async (req, res) => {
     const result = await executeSmartTool(toolSlug, content, options);
     res.json({ result });
   } catch (error) {
-    res.status(500).json({ message: error.message || "Failed to execute smart tool" });
+    res.status(error.status || 500).json({ message: error.message || "Failed to execute smart tool" });
   }
 });
 

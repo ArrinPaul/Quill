@@ -1,4 +1,6 @@
 "use client";
+import { activateOnKey } from "@/lib/a11y";
+import { useEscape } from "@/hooks/useEscape";
 import { toast } from 'sonner';
 
 import { useState, useEffect } from "react";
@@ -6,11 +8,13 @@ import { AlertCircle, ArrowLeft, ArrowRight, BookOpen01 as BookOpen, Bookmark, C
 import { api } from "@/lib/api";
 
 interface Flashcard {
-  id: number;
+  id: string | number;
   front: string;
   back: string;
   citation?: string;
   status?: "mastered" | "review" | "unseen";
+  interval_days?: number;
+  next_review_at?: string;
 }
 
 interface Deck {
@@ -47,16 +51,19 @@ export default function FlashcardsPage() {
   const [activeView, setActiveView] = useState<"carousel" | "grid" | "list">("carousel");
   
   // Flashcard Grid Individual Flip States
-  const [gridFlippedState, setGridFlippedState] = useState<Record<number, boolean>>({});
+  const [gridFlippedState, setGridFlippedState] = useState<Record<string | number, boolean>>({});
 
   // Inline Flashcard Editing States
-  const [editingCardId, setEditingCardId] = useState<number | null>(null);
+  const [editingCardId, setEditingCardId] = useState<string | number | null>(null);
   const [editCardFront, setEditCardFront] = useState("");
   const [editCardBack, setEditCardBack] = useState("");
   const [editCardCitation, setEditCardCitation] = useState("");
+  const [deleteConfirm, setDeleteConfirm] = useState<{ type: "card" | "deck"; id: string | number; label: string } | null>(null);
 
   // Manual Card Addition Inputs
   const [showAddCardInline, setShowAddCardInline] = useState(false);
+  useEscape(isDeckModalOpen, () => setIsDeckModalOpen(false));
+  useEscape(!!deleteConfirm, () => setDeleteConfirm(null));
   const [newCardFront, setNewCardFront] = useState("");
   const [newCardBack, setNewCardBack] = useState("");
   const [newCardCitation, setNewCardCitation] = useState("");
@@ -111,7 +118,7 @@ export default function FlashcardsPage() {
     try {
       let extractedText = "";
 
-      if (file.name.endsWith(".pdf")) {
+      if (file.name.toLowerCase().endsWith(".pdf")) {
         const pdfjsLib = await loadPdfJs();
         if (!pdfjsLib) throw new Error("Could not initialize PDF reader module.");
 
@@ -215,28 +222,41 @@ export default function FlashcardsPage() {
   };
 
   // Add custom manual card
-  const handleAddManualCard = () => {
+  const handleAddManualCard = async () => {
     if (!newCardFront.trim() || !newCardBack.trim()) {
       toast.error("Please provide both front and back values.");
       return;
     }
 
-    const newCard: Flashcard = {
-      id: flashcards.length,
-      front: newCardFront.trim(),
-      back: newCardBack.trim(),
-      citation: newCardCitation.trim() || "Manually added concept.",
-      status: "unseen" as const
-    };
+    if (!selectedDeckId) {
+      toast.error("Please select or create a deck first.");
+      return;
+    }
 
-    setFlashcards(prev => [...prev, newCard]);
-    setNewCardFront("");
-    setNewCardBack("");
-    setNewCardCitation("");
-    setShowAddCardInline(false);
-    
-    setCurrentIndex(flashcards.length);
-    setIsFlipped(false);
+    try {
+      const res = await api.post<{ card: Flashcard }>(`/api/flashcards/decks/${selectedDeckId}/cards`, {
+        front: newCardFront.trim(),
+        back: newCardBack.trim(),
+        citation: newCardCitation.trim() || "Manually added concept.",
+      });
+
+      const savedCard = res.card;
+      const nextCards = [...flashcards, savedCard];
+      setFlashcards(nextCards);
+      setDecks((prev) =>
+        prev.map((d) => (d.id === selectedDeckId ? { ...d, flashcards: nextCards } : d))
+      );
+
+      setNewCardFront("");
+      setNewCardBack("");
+      setNewCardCitation("");
+      setShowAddCardInline(false);
+      setCurrentIndex(nextCards.length - 1);
+      setIsFlipped(false);
+      toast.success("Flashcard added!");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to add flashcard");
+    }
   };
 
   // Edit card inline
@@ -248,37 +268,81 @@ export default function FlashcardsPage() {
     setEditCardCitation(card.citation || "");
   };
 
-  const handleSaveCardEdit = () => {
+  const handleSaveCardEdit = async () => {
     if (!editCardFront.trim() || !editCardBack.trim()) {
       toast.error("Question prompt and answer content cannot be empty.");
       return;
     }
+    if (editingCardId === null) return;
 
-    setFlashcards(prev => 
-      prev.map(c => 
-        c.id === editingCardId 
-          ? { ...c, front: editCardFront.trim(), back: editCardBack.trim(), citation: editCardCitation.trim() } 
-          : c
-      )
-    );
-    setEditingCardId(null);
+    try {
+      const res = await api.put<{ card: Flashcard }>(`/api/flashcards/${editingCardId}`, {
+        front: editCardFront.trim(),
+        back: editCardBack.trim(),
+        citation: editCardCitation.trim(),
+      });
+
+      const updatedCard = res.card;
+      setFlashcards((prev) => prev.map((c) => (c.id === editingCardId ? updatedCard : c)));
+      setDecks((prev) =>
+        prev.map((d) =>
+          d.id === selectedDeckId
+            ? { ...d, flashcards: d.flashcards.map((c) => (c.id === editingCardId ? updatedCard : c)) }
+            : d
+        )
+      );
+      setEditingCardId(null);
+      toast.success("Flashcard updated!");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save flashcard");
+    }
   };
 
-  // Delete specific card
-  const handleDeleteCard = (id: number, e: React.MouseEvent) => {
+  // Delete specific card (opens in-app modal)
+  const handleDeleteCard = (id: string | number, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm("Are you sure you want to remove this flashcard?")) return;
-    
-    const updated = flashcards.filter(c => c.id !== id).map((c, index) => ({
-      ...c,
-      id: index
-    }));
-    setFlashcards(updated);
-    
-    if (currentIndex >= updated.length && updated.length > 0) {
-      setCurrentIndex(updated.length - 1);
+    setDeleteConfirm({ type: "card", id, label: "this flashcard" });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteConfirm) return;
+    try {
+      if (deleteConfirm.type === "card") {
+        await api.delete(`/api/flashcards/${deleteConfirm.id}`);
+        const updated = flashcards.filter((c) => c.id !== deleteConfirm.id);
+        setFlashcards(updated);
+        setDecks((prev) =>
+          prev.map((d) =>
+            d.id === selectedDeckId ? { ...d, flashcards: updated } : d
+          )
+        );
+        if (currentIndex >= updated.length && updated.length > 0) {
+          setCurrentIndex(updated.length - 1);
+        }
+        setIsFlipped(false);
+        toast.success("Flashcard deleted");
+      } else {
+        await api.delete(`/api/flashcards/decks/${deleteConfirm.id}`);
+        const remaining = decks.filter((d) => d.id !== deleteConfirm.id);
+        setDecks(remaining);
+        if (selectedDeckId === deleteConfirm.id) {
+          if (remaining.length > 0) {
+            setSelectedDeckId(remaining[0].id);
+            setFlashcards(remaining[0].flashcards || []);
+          } else {
+            setSelectedDeckId(null);
+            setFlashcards([]);
+          }
+          setCurrentIndex(0);
+          setIsFlipped(false);
+        }
+        toast.success("Deck deleted");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete");
+    } finally {
+      setDeleteConfirm(null);
     }
-    setIsFlipped(false);
   };
 
   // Mark mastery status
@@ -294,19 +358,24 @@ export default function FlashcardsPage() {
     
     // API call
     try {
-      await api.patch(`/api/flashcards/${cardId}/status`, { status });
-      // Update the deck state as well to maintain consistency
+      const res = await api.patch<{ card: Flashcard }>(`/api/flashcards/${cardId}/status`, { status });
+      const updatedCard = res.card || { ...flashcards[currentIndex], status };
+      setFlashcards((prev) =>
+        prev.map((c) => (c.id === cardId ? { ...c, ...updatedCard } : c))
+      );
       setDecks(prev => prev.map(d => {
         if (d.id === selectedDeckId) {
           return {
             ...d,
-            flashcards: d.flashcards.map(c => c.id === cardId ? { ...c, status } : c)
+            flashcards: d.flashcards.map(c => c.id === cardId ? { ...c, ...updatedCard } : c)
           };
         }
         return d;
       }));
     } catch (err) {
       console.error("Failed to update status", err);
+      setFlashcards((prev) => prev.map((c) => (c.id === cardId ? { ...c, status: flashcards[currentIndex].status } : c)));
+      setError("Couldn't save your progress for that card. Please try again.");
     }
 
     if (currentIndex < flashcards.length - 1) {
@@ -343,9 +412,8 @@ export default function FlashcardsPage() {
   };
 
   const handleRestudyReviews = () => {
-    const reviewsOnly = flashcards.filter(c => c.status === "review").map((c, index) => ({
+    const reviewsOnly = flashcards.filter(c => c.status === "review").map((c) => ({
       ...c,
-      id: index,
       status: "unseen" as const
     }));
     setFlashcards(reviewsOnly);
@@ -419,7 +487,7 @@ export default function FlashcardsPage() {
         </h1>
 
         {/* Global actions */}
-        {flashcards.length > 0 && (
+        {(flashcards.length > 0 || selectedDeckId) && (
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => setShowAddCardInline(!showAddCardInline)}
@@ -432,7 +500,7 @@ export default function FlashcardsPage() {
               onClick={handleClearDeck}
               className="px-4 py-2 border border-border hover:bg-accent text-sm font-medium rounded-[10px] text-foreground transition-standard cursor-pointer"
             >
-              Clear Deck
+              Close Deck
             </button>
             <button
               onClick={handleCopyAll}
@@ -489,9 +557,13 @@ export default function FlashcardsPage() {
               ) : (
                 decks.map((deck) => {
                   const isSelected = selectedDeckId === deck.id;
+                  const dueCount = (deck.flashcards || []).filter(
+                    (c) => !c.next_review_at || new Date(c.next_review_at) <= new Date() || c.status !== "mastered"
+                  ).length;
                   return (
                     <div 
                       key={deck.id}
+                      role="button" tabIndex={0} onKeyDown={activateOnKey}
                       onClick={() => {
                         setSelectedDeckId(deck.id);
                         setFlashcards(deck.flashcards || []);
@@ -501,19 +573,38 @@ export default function FlashcardsPage() {
                       }}
                       className={`group border rounded-[10px] p-3 transition-standard cursor-pointer flex flex-col gap-1.5 relative ${
                         isSelected 
-                          ? "bg-white border-primary/40 shadow-sm" 
+                          ? "bg-card border-primary/40 shadow-sm" 
                           : "bg-transparent border-border hover:bg-muted/45"
                       }`}
                     >
                       <div className="flex items-center gap-1.5">
                         <BookOpen className={`w-3.5 h-3.5 flex-shrink-0 ${isSelected ? "text-primary" : "text-muted-foreground"}`} />
-                        <h4 className="font-semibold text-xs text-foreground truncate pr-6">
+                        <h4 className="font-semibold text-xs text-foreground truncate pr-7">
                           {deck.title}
                         </h4>
                       </div>
-                      <p className="text-xs text-muted-foreground font-mono pl-5">
-                        {deck.flashcards?.length || 0} cards
-                      </p>
+                      <button
+                        type="button"
+                        aria-label={`Delete ${deck.title}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteConfirm({ type: "deck", id: deck.id, label: `"${deck.title}"` });
+                        }}
+                        className="absolute top-2.5 right-2.5 p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                        title="Delete deck"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                      <div className="flex items-center justify-between pl-5 pr-1">
+                        <p className="text-xs text-muted-foreground font-mono">
+                          {deck.flashcards?.length || 0} cards
+                        </p>
+                        {dueCount > 0 && (
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700">
+                            {dueCount} due
+                          </span>
+                        )}
+                      </div>
                     </div>
                   );
                 })
@@ -551,7 +642,7 @@ export default function FlashcardsPage() {
                     type="text"
                     value={newCardFront}
                     onChange={(e) => setNewCardFront(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-border rounded-[10px] text-xs focus:outline-none focus:ring-2 focus:ring-ring text-foreground font-sans"
+                    className="w-full px-3 py-2 bg-card border border-border rounded-[10px] text-xs focus:outline-none focus:ring-2 focus:ring-ring text-foreground font-sans"
                     placeholder="e.g. What is Active Recall?"
                   />
                 </div>
@@ -562,7 +653,7 @@ export default function FlashcardsPage() {
                   <textarea
                     value={newCardBack}
                     onChange={(e) => setNewCardBack(e.target.value)}
-                    className="w-full h-16 px-3 py-2 bg-white border border-border rounded-[10px] text-xs focus:outline-none focus:ring-2 focus:ring-ring text-foreground resize-none font-sans"
+                    className="w-full h-16 px-3 py-2 bg-card border border-border rounded-[10px] text-xs focus:outline-none focus:ring-2 focus:ring-ring text-foreground resize-none font-sans"
                     placeholder="e.g. Active retrieval testing."
                   />
                 </div>
@@ -576,7 +667,7 @@ export default function FlashcardsPage() {
                   type="text"
                   value={newCardCitation}
                   onChange={(e) => setNewCardCitation(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-border rounded-[10px] text-xs focus:outline-none focus:ring-2 focus:ring-ring text-foreground font-sans"
+                  className="w-full px-3 py-2 bg-card border border-border rounded-[10px] text-xs focus:outline-none focus:ring-2 focus:ring-ring text-foreground font-sans"
                   placeholder="e.g. Page 45"
                 />
               </div>
@@ -600,7 +691,7 @@ export default function FlashcardsPage() {
 
           {/* Empty Desk */}
           {flashcards.length === 0 && !loading && (
-            <div className="bg-white border border-border rounded-[10px] p-12 text-center shadow-sm">
+            <div className="bg-card border border-border rounded-[10px] p-12 text-center shadow-sm">
               <Layers className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-foreground mb-2">Notebook Study Guide</h3>
               <p className="text-sm text-muted-foreground mb-4">
@@ -627,7 +718,7 @@ export default function FlashcardsPage() {
 
           {/* Loading */}
           {loading && (
-            <div className="h-[460px] border border-border rounded-[10px] bg-white flex flex-col items-center justify-center text-center p-8 shadow-sm">
+            <div className="h-[460px] border border-border rounded-[10px] bg-card flex flex-col items-center justify-center text-center p-8 shadow-sm">
               <Loader2 className="w-10 h-10 text-primary animate-spin mb-4" />
               <h3 className="text-lg font-bold text-foreground font-sans">Deconstructing Materials</h3>
               <p className="text-sm text-muted-foreground max-w-xs font-sans italic mt-1.5 leading-relaxed">
@@ -675,9 +766,9 @@ export default function FlashcardsPage() {
                 {/* Progress Indicators */}
                 <div className="flex items-center gap-3 text-xs font-medium text-muted-foreground">
                   <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-purple-600" /> {masteredCount} Got It</span>
-                  <span className="h-3 w-px bg-[#e0d4f0]" />
+                  <span className="h-3 w-px bg-[#e0d4f0] dark:bg-muted" />
                   <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500" /> {reviewCount} Reviews</span>
-                  <span className="h-3 w-px bg-[#e0d4f0]" />
+                  <span className="h-3 w-px bg-[#e0d4f0] dark:bg-muted" />
                   <span className="font-semibold text-foreground">{Math.round(((masteredCount + reviewCount) / flashcards.length) * 100)}% Complete</span>
                 </div>
               </div>
@@ -689,8 +780,8 @@ export default function FlashcardsPage() {
                     <div className="space-y-6">
                       <div className="relative group">
                         {editingCardId === flashcards[currentIndex].id ? (
-                          <div className="w-full h-80 rounded-[10px] border border-[#5b21b6] bg-white p-6 space-y-4 shadow-sm">
-                            <h4 className="text-xs font-bold text-primary uppercase font-mono border-b border-[#f3eff8] pb-2">
+                          <div className="w-full h-80 rounded-[10px] border border-[#5b21b6] bg-card p-6 space-y-4 shadow-sm">
+                            <h4 className="text-xs font-bold text-primary uppercase font-mono border-b border-[#f3eff8] dark:border-border pb-2">
                               Edit Flashcard #{currentIndex + 1}
                             </h4>
                             
@@ -730,7 +821,7 @@ export default function FlashcardsPage() {
                               />
                             </div>
 
-                            <div className="flex justify-end gap-2 pt-1 border-t border-[#f3eff8]">
+                            <div className="flex justify-end gap-2 pt-1 border-t border-[#f3eff8] dark:border-border">
                               <button
                                 onClick={() => setEditingCardId(null)}
                                 className="px-3.5 py-1.5 border border-border text-foreground rounded-[10px] text-xs font-semibold hover:bg-card transition-standard"
@@ -754,8 +845,8 @@ export default function FlashcardsPage() {
                               isFlipped ? '[transform:rotateY(180deg)]' : ''
                             }`}>
                               
-                              <div className="absolute inset-0 w-full h-full rounded-[10px] border border-border bg-white p-8 flex flex-col justify-between shadow-sm [backface-visibility:hidden]">
-                                <div className="flex items-center justify-between border-b border-[#f3eff8] pb-3">
+                              <div className="absolute inset-0 w-full h-full rounded-[10px] border border-border bg-card p-8 flex flex-col justify-between shadow-sm [backface-visibility:hidden]">
+                                <div className="flex items-center justify-between border-b border-[#f3eff8] dark:border-border pb-3">
                                   <span className="text-xs font-bold text-primary tracking-wider uppercase flex items-center gap-1">
                                     <Bookmark className="w-3.5 h-3.5 text-primary" />
                                     Concept Prompt
@@ -786,13 +877,13 @@ export default function FlashcardsPage() {
                                   </h2>
                                 </div>
                                 
-                                <div className="text-center text-xs text-muted-foreground font-sans italic border-t border-[#f3eff8] pt-3 flex items-center justify-center gap-1.5">
+                                <div className="text-center text-xs text-muted-foreground font-sans italic border-t border-[#f3eff8] dark:border-border pt-3 flex items-center justify-center gap-1.5">
                                   <RotateCw className="w-3.5 h-3.5 text-primary" /> Click to reveal answer
                                 </div>
                               </div>
 
-                              <div className="absolute inset-0 w-full h-full rounded-[10px] border border-[#5b21b6]/30 bg-[#f5f0fa] p-8 flex flex-col justify-between shadow-sm [backface-visibility:hidden] [transform:rotateY(180deg)]">
-                                <div className="flex items-center justify-between border-b border-[#e0daf0] pb-3">
+                              <div className="absolute inset-0 w-full h-full rounded-[10px] border border-[#5b21b6]/30 bg-[#f5f0fa] dark:bg-muted p-8 flex flex-col justify-between shadow-sm [backface-visibility:hidden] [transform:rotateY(180deg)]">
+                                <div className="flex items-center justify-between border-b border-[#e0daf0] dark:border-border pb-3">
                                   <span className="text-xs font-bold text-primary tracking-wider uppercase flex items-center gap-1">
                                     <CheckCircle className="w-3.5 h-3.5 text-primary" />
                                     AI Answer Verification
@@ -808,7 +899,7 @@ export default function FlashcardsPage() {
                                   </p>
                                   
                                   {flashcards[currentIndex].citation && (
-                                    <div className="text-left bg-[#f0e8fa] border-l-2 border-[#5b21b6] px-3.5 py-2 text-xs text-muted-foreground font-sans italic max-w-lg mx-auto rounded-[4px]">
+                                    <div className="text-left bg-[#f0e8fa] dark:bg-muted border-l-2 border-[#5b21b6] px-3.5 py-2 text-xs text-muted-foreground font-sans italic max-w-lg mx-auto rounded-[4px]">
                                       <strong className="text-xs font-bold text-primary font-sans block not-italic uppercase mb-0.5">
                                         Source Citation Document:
                                       </strong>
@@ -817,7 +908,7 @@ export default function FlashcardsPage() {
                                   )}
                                 </div>
                                 
-                                <div className="flex items-center justify-between border-t border-[#e0daf0] pt-3">
+                                <div className="flex items-center justify-between border-t border-[#e0daf0] dark:border-border pt-3">
                                   <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                                     <button
                                       onClick={(e) => handleCopyCard(currentIndex, e)}
@@ -869,7 +960,7 @@ export default function FlashcardsPage() {
                         <div className="flex items-center gap-2.5">
                           <button
                             onClick={() => handleSetStatus("review")}
-                            className="inline-flex items-center gap-2 px-5 py-2.5 border border-[#eedebb] bg-[#fdf9f2] hover:bg-[#f5ebd7] text-foreground font-semibold rounded-[10px] text-xs transition-standard cursor-pointer"
+                            className="inline-flex items-center gap-2 px-5 py-2.5 border border-[#eedebb] dark:border-border bg-[#fdf9f2] dark:bg-muted hover:bg-[#f5ebd7] text-foreground font-semibold rounded-[10px] text-xs transition-standard cursor-pointer"
                           >
                             <XCircle className="w-4 h-4" />
                             Still Learning (1)
@@ -921,8 +1012,8 @@ export default function FlashcardsPage() {
                               isCardFlipped ? '[transform:rotateY(180deg)]' : ''
                             }`}>
                               
-                              <div className="absolute inset-0 w-full h-full rounded-[10px] border border-border bg-white p-5 flex flex-col justify-between shadow-sm [backface-visibility:hidden]">
-                                <div className="flex justify-between items-center border-b border-[#f3eff8] pb-2" onClick={(e) => e.stopPropagation()}>
+                              <div className="absolute inset-0 w-full h-full rounded-[10px] border border-border bg-card p-5 flex flex-col justify-between shadow-sm [backface-visibility:hidden]">
+                                <div className="flex justify-between items-center border-b border-[#f3eff8] dark:border-border pb-2" onClick={(e) => e.stopPropagation()}>
                                   <span className="text-xs font-mono text-muted-foreground">
                                     CARD {idx + 1}
                                   </span>
@@ -946,7 +1037,7 @@ export default function FlashcardsPage() {
                                     {card.front}
                                   </h4>
                                 </div>
-                                <div className="flex items-center justify-between pt-1.5 border-t border-[#f3eff8]">
+                                <div className="flex items-center justify-between pt-1.5 border-t border-[#f3eff8] dark:border-border">
                                   <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full ${statusColor}`}>
                                     {cardStatus}
                                   </span>
@@ -956,8 +1047,8 @@ export default function FlashcardsPage() {
                                 </div>
                               </div>
 
-                              <div className="absolute inset-0 w-full h-full rounded-[10px] border border-[#5b21b6]/20 bg-[#fbfbfa] p-5 flex flex-col justify-between shadow-sm [backface-visibility:hidden] [transform:rotateY(180deg)]">
-                                <div className="flex justify-between items-center border-b border-[#e0daf0] pb-2" onClick={(e) => e.stopPropagation()}>
+                              <div className="absolute inset-0 w-full h-full rounded-[10px] border border-[#5b21b6]/20 bg-[#fbfbfa] dark:bg-muted p-5 flex flex-col justify-between shadow-sm [backface-visibility:hidden] [transform:rotateY(180deg)]">
+                                <div className="flex justify-between items-center border-b border-[#e0daf0] dark:border-border pb-2" onClick={(e) => e.stopPropagation()}>
                                   <span className="text-xs font-bold text-primary uppercase">
                                     Answer Description
                                   </span>
@@ -975,7 +1066,7 @@ export default function FlashcardsPage() {
                                     {card.back}
                                   </p>
                                 </div>
-                                <div className="text-center text-xs text-muted-foreground italic font-sans pt-1.5 border-t border-[#e0daf0]">
+                                <div className="text-center text-xs text-muted-foreground italic font-sans pt-1.5 border-t border-[#e0daf0] dark:border-border">
                                   Click to flip back
                                 </div>
                               </div>
@@ -989,7 +1080,7 @@ export default function FlashcardsPage() {
 
                   {/* LIST */}
                   {activeView === "list" && (
-                    <div className="bg-white border border-border rounded-[10px] overflow-hidden divide-y divide-[#e0d4f0] shadow-sm">
+                    <div className="bg-card border border-border rounded-[10px] overflow-hidden divide-y divide-[#e0d4f0] shadow-sm">
                       {flashcards.map((card, idx) => (
                         <div key={idx} className="p-5 hover:bg-background transition-standard space-y-2.5 relative group">
                           <div className="absolute right-4 top-4 flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-standard">
@@ -1062,9 +1153,9 @@ export default function FlashcardsPage() {
                 </>
               ) : (
                 /* SUMMARY */
-                <div className="bg-white border border-border rounded-[10px] p-8 shadow-sm text-center space-y-6">
+                <div className="bg-card border border-border rounded-[10px] p-8 shadow-sm text-center space-y-6">
                   <div className="max-w-md mx-auto space-y-2">
-                    <div className="w-14 h-14 rounded-full bg-[#f3edfa] border border-[#d2c0f0] text-primary flex items-center justify-center mx-auto text-xl font-bold">
+                    <div className="w-14 h-14 rounded-full bg-[#f3edfa] dark:bg-muted border border-[#d2c0f0] dark:border-border text-primary flex items-center justify-center mx-auto text-xl font-bold">
                       ✓
                     </div>
                     <h2 className="text-2xl font-bold text-foreground font-sans">Study Session Completed!</h2>
@@ -1074,11 +1165,11 @@ export default function FlashcardsPage() {
                   </div>
 
                   <div className="grid grid-cols-3 gap-4 max-w-md mx-auto pt-2">
-                    <div className="bg-[#f3edfa] border border-[#d2c0f0] rounded-[10px] p-4 text-center">
+                    <div className="bg-[#f3edfa] dark:bg-muted border border-[#d2c0f0] dark:border-border rounded-[10px] p-4 text-center">
                       <div className="text-3xl font-extrabold text-primary">{masteredCount}</div>
                       <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider mt-1">Mastered</div>
                     </div>
-                    <div className="bg-[#fdf9f2] border border-[#eedebb] rounded-[10px] p-4 text-center">
+                    <div className="bg-[#fdf9f2] dark:bg-muted border border-[#eedebb] dark:border-border rounded-[10px] p-4 text-center">
                       <div className="text-3xl font-extrabold text-foreground">{reviewCount}</div>
                       <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider mt-1">Review Needed</div>
                     </div>
@@ -1099,7 +1190,7 @@ export default function FlashcardsPage() {
                     </div>
                   </div>
 
-                  <div className="flex justify-center gap-3 pt-6 border-t border-[#f3eff8] mt-6">
+                  <div className="flex justify-center gap-3 pt-6 border-t border-[#f3eff8] dark:border-border mt-6">
                     <button
                       onClick={handleRestart}
                       className="px-5 py-2.5 border border-[#5b21b6] hover:bg-[#f1ecf8] text-primary font-semibold rounded-[10px] text-xs transition-standard cursor-pointer"
@@ -1133,8 +1224,8 @@ export default function FlashcardsPage() {
 
       {/* New Deck Modal */}
       {isDeckModalOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
-          <div className="bg-white rounded-[12px] border border-border shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 flex flex-col space-y-4">
+        <div role="dialog" aria-modal="true" className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-card rounded-[12px] border border-border shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 flex flex-col space-y-4">
             <div className="flex items-center justify-between border-b border-border pb-4 mb-4">
               <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
                 <FileText className="w-5 h-5 text-primary" />
@@ -1190,7 +1281,7 @@ export default function FlashcardsPage() {
                     type="text"
                     value={modalTitle}
                     onChange={(e) => setModalTitle(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-border rounded-[10px] text-xs focus:outline-none focus:ring-2 focus:ring-ring text-foreground"
+                    className="w-full px-3 py-2 bg-card border border-border rounded-[10px] text-xs focus:outline-none focus:ring-2 focus:ring-ring text-foreground"
                     placeholder="e.g. Photosynthesis Notes"
                   />
                 </div>
@@ -1202,7 +1293,7 @@ export default function FlashcardsPage() {
                   <textarea
                     value={modalContent}
                     onChange={(e) => setModalContent(e.target.value)}
-                    className="w-full h-44 px-3 py-2 bg-white border border-border rounded-[10px] text-xs focus:outline-none focus:ring-2 focus:ring-ring resize-none text-foreground font-sans leading-relaxed"
+                    className="w-full h-44 px-3 py-2 bg-card border border-border rounded-[10px] text-xs focus:outline-none focus:ring-2 focus:ring-ring resize-none text-foreground font-sans leading-relaxed"
                     placeholder="Paste details or notes here..."
                   />
                 </div>
@@ -1211,7 +1302,7 @@ export default function FlashcardsPage() {
 
             {/* TAB B: File Upload */}
             {modalTab === "upload" && (
-              <div className="py-6 flex flex-col items-center justify-center border-2 border-dashed border-border rounded-[10px] bg-white transition-standard hover:bg-background/50 text-center p-6 relative">
+              <div className="py-6 flex flex-col items-center justify-center border-2 border-dashed border-border rounded-[10px] bg-card transition-standard hover:bg-background/50 text-center p-6 relative">
                 {fileLoading ? (
                   <div className="flex flex-col items-center gap-3">
                     <Loader2 className="w-8 h-8 text-primary animate-spin" />
@@ -1257,6 +1348,44 @@ export default function FlashcardsPage() {
                 className="px-4 py-2 bg-primary hover:opacity-90 disabled:opacity-50 text-primary-foreground font-semibold rounded-[10px] text-xs transition-standard shadow-sm"
               >
                 {loading ? "Generating..." : "Generate Flashcards"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div role="dialog" aria-modal="true"
+          className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200"
+          onClick={() => setDeleteConfirm(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="bg-card rounded-[12px] border border-border shadow-2xl max-w-md w-full p-6 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-bold text-foreground">
+              Delete {deleteConfirm.type === "deck" ? "Deck" : "Flashcard"}?
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to delete {deleteConfirm.label}? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirm(null)}
+                className="px-4 py-2 border border-border rounded-[10px] text-sm font-medium text-muted-foreground hover:bg-muted transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                className="px-4 py-2 bg-red-600 text-white rounded-[10px] text-sm font-semibold hover:bg-red-700 transition-colors cursor-pointer"
+              >
+                Delete
               </button>
             </div>
           </div>

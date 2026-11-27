@@ -1,6 +1,9 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+/* dark: utilities follow the .dark class (the theme toggle), not only the OS setting */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme inline {
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));
@@ -53,7 +56,7 @@
   --foreground: 24 20% 95%;
   --card: 350 20% 14%;
   --card-foreground: 24 20% 95%;
-  --primary: 350 55% 45%;
+  --primary: 350 55% 56%;
   --primary-foreground: 0 0% 100%;
   --secondary: 350 30% 20%;
   --secondary-foreground: 0 0% 100%;
@@ -65,8 +68,29 @@
   --destructive-foreground: 0 0% 100%;
   --border: 350 20% 22%;
   --input: 350 20% 18%;
-  --ring: 350 55% 45%;
+  --ring: 350 55% 56%;
 }
+
+/* Pale status tints and their dark text are unreadable on a dark surface */
+.dark {
+  color-scheme: dark;
+}
+.dark :is(.bg-emerald-50, .bg-emerald-100) { background-color: hsl(160 50% 40% / 0.18); }
+.dark :is(.text-emerald-600, .text-emerald-700, .text-emerald-800, .text-emerald-900) { color: hsl(160 70% 72%); }
+.dark :is(.bg-green-50, .bg-green-100) { background-color: hsl(142 50% 40% / 0.18); }
+.dark :is(.text-green-600, .text-green-700, .text-green-800, .text-green-900) { color: hsl(142 70% 72%); }
+.dark :is(.bg-red-50, .bg-red-100) { background-color: hsl(0 50% 40% / 0.18); }
+.dark :is(.text-red-600, .text-red-700, .text-red-800, .text-red-900) { color: hsl(0 70% 72%); }
+.dark :is(.bg-blue-50, .bg-blue-100) { background-color: hsl(215 50% 40% / 0.18); }
+.dark :is(.text-blue-600, .text-blue-700, .text-blue-800, .text-blue-900) { color: hsl(215 70% 72%); }
+.dark :is(.bg-amber-50, .bg-amber-100) { background-color: hsl(40 50% 40% / 0.18); }
+.dark :is(.text-amber-600, .text-amber-700, .text-amber-800, .text-amber-900) { color: hsl(40 70% 72%); }
+.dark :is(.bg-yellow-50, .bg-yellow-100) { background-color: hsl(48 50% 40% / 0.18); }
+.dark :is(.text-yellow-600, .text-yellow-700, .text-yellow-800, .text-yellow-900) { color: hsl(48 70% 72%); }
+.dark :is(.bg-orange-50, .bg-orange-100) { background-color: hsl(24 50% 40% / 0.18); }
+.dark :is(.text-orange-600, .text-orange-700, .text-orange-800, .text-orange-900) { color: hsl(24 70% 72%); }
+.dark :is(.bg-purple-50, .bg-purple-100) { background-color: hsl(270 50% 40% / 0.18); }
+.dark :is(.text-purple-600, .text-purple-700, .text-purple-800, .text-purple-900) { color: hsl(270 70% 72%); }
 
 * {
   border-color: hsl(var(--border));
@@ -213,4 +237,26 @@ h1, h2, h3, h4, h5, h6 {
 
 .footer-gradient {
   background: hsl(var(--canvas-soft, 30 6% 96%));
+}
+
+/* The brand red is too dim as text on dark surfaces */
+.dark :is(.text-primary, .hover:text-primary:hover) {
+  color: hsl(350 75% 74%);
+}
+
+.dark .driver-popover {
+  background: hsl(var(--card));
+  color: hsl(var(--card-foreground));
+}
+.dark .driver-popover :is(.driver-popover-title, .driver-popover-description, .driver-popover-progress-text) {
+  color: hsl(var(--card-foreground));
+}
+.dark .driver-popover button:not(.driver-popover-close-btn) {
+  background: hsl(var(--muted));
+  color: hsl(var(--card-foreground));
+  text-shadow: none;
+}
+
+.dark .text-secondary {
+  color: hsl(45 45% 75%);
 }

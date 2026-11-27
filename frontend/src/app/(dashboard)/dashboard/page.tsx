@@ -1,5 +1,7 @@
 "use client";
 
+import { activateOnKey } from "@/lib/a11y";
+import { useEscape } from "@/hooks/useEscape";
 import React, { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { StatCard } from "@/features/dashboard/components/StatCard";
@@ -45,6 +47,9 @@ function PopoutWidget({ children }: { children: React.ReactNode }) {
             ? "fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
             : "relative w-full h-full cursor-pointer transition-transform hover:-translate-y-1 hover:shadow-md rounded-xl"
         }
+        role={isExpanded ? "dialog" : "button"}
+        tabIndex={0}
+        onKeyDown={activateOnKey}
         onClick={() => {
           if (!isExpanded) setIsExpanded(true);
         }}
@@ -170,7 +175,7 @@ export default function DashboardPage() {
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-24 bg-white border border-border rounded-xl animate-pulse" />
+            <div key={i} className="h-24 bg-card border border-border rounded-xl animate-pulse" />
           ))}
         </div>
       ) : (

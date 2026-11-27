@@ -42,7 +42,7 @@ export function WeeklyProgressWidget({ tasks = [] }: WeeklyProgressWidgetProps) 
   const hasAnyTasks = totalCompleted > 0 || totalPending > 0;
 
   return (
-    <div className="bg-white border border-border rounded-[10px] p-5 card-hover h-full flex flex-col">
+    <div className="bg-card border border-border rounded-[10px] p-5 card-hover h-full flex flex-col">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold text-foreground text-sm">Weekly Progress</h3>
         <span className="text-xs text-muted-foreground">{totalCompleted} done this week</span>

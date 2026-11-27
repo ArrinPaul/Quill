@@ -3,8 +3,14 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { getClient } = require("../services/supabase");
 const authMiddleware = require("../middleware/auth");
+const { isEmailConfigured, sendPasswordReset } = require("../services/email");
 
 const router = express.Router();
+
+router.use((req, res, next) => {
+  if (typeof req.body?.email === "string") req.body.email = req.body.email.trim().toLowerCase();
+  next();
+});
 
 router.post("/check-email", async (req, res) => {
   try {
@@ -196,17 +202,22 @@ router.post("/forgot-password", async (req, res) => {
       return res.status(400).json({ message: "Email is required" });
     }
 
+    // Without an email provider, the link is only ever shown on a local development server
+    const showLink = !isEmailConfigured() && process.env.DEV_MODE === "true" && process.env.NODE_ENV !== "production";
+    if (!isEmailConfigured() && !showLink) {
+      return res.status(503).json({ message: "Password reset email is not set up on this server." });
+    }
+
+    // Same message either way, so this can't be used to discover accounts
+    const message = "If an account with that email exists, a password reset link has been sent.";
+
     const { data: student } = await getClient()
       .from("students")
       .select("id, email, password_hash")
-      .eq("email", email.trim())
-      .single();
+      .eq("email", email)
+      .maybeSingle();
 
-    if (!student) {
-      return res.json({
-        message: "If an account with that email exists, password reset instructions have been prepared.",
-      });
-    }
+    if (!student) return res.json({ message });
 
     const resetToken = jwt.sign(
       {
@@ -219,15 +230,14 @@ router.post("/forgot-password", async (req, res) => {
       { expiresIn: "15m" }
     );
 
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+    const frontendUrl = (process.env.FRONTEND_URL || "http://localhost:3000").split(",")[0].trim().replace(/\/$/, "");
     const resetUrl = `${frontendUrl}/forgot-password?token=${resetToken}`;
 
-    res.json({
-      message: "Password reset link generated.",
-      ...(process.env.DEV_MODE === "true" || process.env.NODE_ENV !== "production"
-        ? { resetUrl }
-        : {}),
-    });
+    if (showLink) return res.json({ message, resetUrl });
+
+    // Not awaited: response time shouldn't reveal whether the account exists
+    sendPasswordReset(student.email, resetUrl).catch((err) => console.error("Password reset email failed:", err.message));
+    res.json({ message });
   } catch (error) {
     res.status(500).json({ message: error.message || "Failed to process password reset" });
   }

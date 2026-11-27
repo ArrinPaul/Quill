@@ -57,7 +57,7 @@ export function ProductivityScoreWidget({ tasks = [], attendance = [] }: Product
   }
 
   return (
-    <div className="bg-white border border-border rounded-[10px] p-5 card-hover h-full">
+    <div className="bg-card border border-border rounded-[10px] p-5 card-hover h-full">
       <h3 className="font-semibold text-foreground text-sm mb-4">Productivity Score</h3>
 
       <div className="flex items-center justify-center mb-4">

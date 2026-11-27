@@ -58,7 +58,7 @@ function MermaidDiagram({ chart, id }: { chart: string; id: string }) {
   return (
     <div
       ref={containerRef}
-      className="w-full overflow-x-auto bg-white border border-border rounded-[12px] p-4 sm:p-6 flex justify-center"
+      className="w-full overflow-x-auto bg-card border border-border rounded-[12px] p-4 sm:p-6 flex justify-center"
     />
   );
 }
@@ -68,7 +68,6 @@ const SYSTEM_DIAGRAM = `flowchart LR
   BE -->|"supabase-js"| DB[("Supabase PostgreSQL")]
   BE -->|"Fallback"| WBF["whiteboards_db.json"]
   BE -->|"groq-sdk"| GROQ["Groq Cloud LLM"]
-  BE -->|"OAuth2 + Calendar API"| GCAL["Google Calendar"]
 `;
 
 const AUTH_SEQUENCE = `sequenceDiagram
@@ -146,10 +145,7 @@ const ENDPOINTS: Endpoint[] = [
   { group: "Whiteboards", method: "PUT", path: "/api/whiteboards/:id", auth: "JWT", purpose: "Auto-save shapes, layers, and viewport", file: "backend/src/routes/whiteboards.js" },
   { group: "Whiteboards", method: "DELETE", path: "/api/whiteboards/:id", auth: "JWT", purpose: "Delete a whiteboard", file: "backend/src/routes/whiteboards.js" },
 
-  { group: "Google & Calendar", method: "GET", path: "/api/auth/google/url", auth: "Public", purpose: "Get OAuth URL to link Google Calendar (requires state)", file: "backend/src/routes/google.js" },
-  { group: "Google & Calendar", method: "GET", path: "/api/auth/google/status", auth: "JWT", purpose: "Check if Google Calendar is connected", file: "backend/src/routes/google.js" },
-  { group: "Google & Calendar", method: "GET", path: "/api/auth/google/calendar/events", auth: "JWT", purpose: "Fetch upcoming Google Calendar events", file: "backend/src/routes/google.js" },
-  { group: "Google & Calendar", method: "GET", path: "/api/calendar/feed/:student_id", auth: "Public", purpose: "Export student deadlines as ICS calendar feed", file: "backend/src/routes/calendar.js" },
+  { group: "Calendar", method: "GET", path: "/api/calendar/feed/:student_id", auth: "Public", purpose: "Export deadlines as ICS feed (signed link required)", file: "backend/src/routes/calendar.js" },
 
   { group: "Gamification", method: "GET", path: "/api/achievements", auth: "JWT", purpose: "Compute XP, level, and 7 academic badges", file: "backend/src/routes/achievements.js" },
   { group: "Gamification", method: "POST", path: "/api/activity/ping", auth: "JWT", purpose: "Update daily study streak", file: "backend/src/routes/activity.js" },
@@ -162,7 +158,7 @@ const TABLES = [
   { name: "tasks", keyFields: "id, student_id, title, subject, deadline, reminder_time, status" },
   { name: "notices", keyFields: "id, student_id, notice_text, ai_summary, event_date, event_title" },
   { name: "attendance", keyFields: "id, student_id, subject, total_classes, attended_classes, threshold" },
-  { name: "preferences", keyFields: "id, user_id, settings (JSONB: streak, focus_minutes, google tokens)" },
+  { name: "preferences", keyFields: "id, user_id, settings (JSONB: streak, focus_minutes)" },
   { name: "whiteboards", keyFields: "id, student_id, title, data (JSONB), thumbnail" },
   { name: "flashcard_decks / flashcards", keyFields: "id, student_id, title / deck_id, front, back, status" },
   { name: "quizzes", keyFields: "id, student_id, title, questions (JSONB), score" },
@@ -217,8 +213,8 @@ export default function ArchitectureDashboardPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+      <header className="sticky top-0 z-30 bg-card/90 backdrop-blur border-b border-border">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center flex-wrap gap-2 py-2 justify-between gap-4">
           <div className="flex items-center gap-3">
             <Link
               href="/dashboard"
@@ -238,7 +234,7 @@ export default function ArchitectureDashboardPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <div
               className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${
                 backendStatus === "online"
@@ -263,10 +259,10 @@ export default function ArchitectureDashboardPage() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8 overflow-x-clip [&_section]:min-w-0 [&_section>*]:min-w-0">
         {/* Top Summary Cards */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white border border-border rounded-[12px] p-5 shadow-xs">
+          <div className="bg-card border border-border rounded-[12px] p-5 shadow-xs">
             <div className="flex items-center gap-2 text-primary font-semibold text-sm mb-1">
               <Layers className="w-4 h-4" />
               Frontend (Port 3000)
@@ -275,7 +271,7 @@ export default function ArchitectureDashboardPage() {
               Next.js 16 App Router, React 19, Tailwind CSS, Zustand, custom <code>api.ts</code> client with Bearer JWT.
             </p>
           </div>
-          <div className="bg-white border border-border rounded-[12px] p-5 shadow-xs">
+          <div className="bg-card border border-border rounded-[12px] p-5 shadow-xs">
             <div className="flex items-center gap-2 text-primary font-semibold text-sm mb-1">
               <Server className="w-4 h-4" />
               Backend (Port 4000)
@@ -284,7 +280,7 @@ export default function ArchitectureDashboardPage() {
               Express.js REST API across 12 route modules, JWT + bcryptjs auth, Multer + pdf-parse, Groq SDK.
             </p>
           </div>
-          <div className="bg-white border border-border rounded-[12px] p-5 shadow-xs">
+          <div className="bg-card border border-border rounded-[12px] p-5 shadow-xs">
             <div className="flex items-center gap-2 text-primary font-semibold text-sm mb-1">
               <Database className="w-4 h-4" />
               Data & Persistence
@@ -293,13 +289,13 @@ export default function ArchitectureDashboardPage() {
               Supabase PostgreSQL via <code>@supabase/supabase-js</code> + local JSON fallback for whiteboards.
             </p>
           </div>
-          <div className="bg-white border border-border rounded-[12px] p-5 shadow-xs">
+          <div className="bg-card border border-border rounded-[12px] p-5 shadow-xs">
             <div className="flex items-center gap-2 text-primary font-semibold text-sm mb-1">
               <Shield className="w-4 h-4" />
               Auth & Integrations
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Pure email/password JWT auth, password reset/change, and per-user Google Calendar OAuth2 sync.
+              Pure email/password JWT auth, password reset/change, and signed calendar feed links.
             </p>
           </div>
         </section>
@@ -323,7 +319,7 @@ export default function ArchitectureDashboardPage() {
                   onClick={() => setActiveTab(t.id as typeof activeTab)}
                   className={`px-3 py-1.5 text-xs font-semibold rounded-[8px] transition-colors ${
                     activeTab === t.id
-                      ? "bg-white text-foreground shadow-xs"
+                      ? "bg-card text-foreground shadow-xs"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
@@ -339,7 +335,7 @@ export default function ArchitectureDashboardPage() {
         </section>
 
         {/* API Explorer */}
-        <section className="bg-white border border-border rounded-[12px] p-5 sm:p-6 shadow-xs space-y-4">
+        <section className="bg-card border border-border rounded-[12px] p-5 sm:p-6 shadow-xs space-y-4">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-bold flex items-center gap-2">
@@ -413,7 +409,7 @@ export default function ArchitectureDashboardPage() {
 
         {/* Database Tables & Extension Guide */}
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white border border-border rounded-[12px] p-5 sm:p-6 shadow-xs space-y-4">
+          <div className="bg-card border border-border rounded-[12px] p-5 sm:p-6 shadow-xs space-y-4">
             <h2 className="text-lg font-bold flex items-center gap-2">
               <Database className="w-5 h-5 text-primary" />
               Supabase Tables
@@ -428,7 +424,7 @@ export default function ArchitectureDashboardPage() {
             </div>
           </div>
 
-          <div className="bg-white border border-border rounded-[12px] p-5 sm:p-6 shadow-xs space-y-4">
+          <div className="bg-card border border-border rounded-[12px] p-5 sm:p-6 shadow-xs space-y-4">
             <h2 className="text-lg font-bold flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-primary" />
               How to Add a New Service or Feature

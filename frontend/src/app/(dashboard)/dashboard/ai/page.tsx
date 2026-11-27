@@ -86,7 +86,7 @@ export default function AiAssistantPage() {
       </div>
 
       {/* Main chat container */}
-      <div className="flex-1 bg-white/60 backdrop-blur-xl border border-white/40 rounded-[24px] shadow-sm overflow-hidden flex flex-col min-h-[400px] relative">
+      <div className="flex-1 bg-card/60 backdrop-blur-xl border border-white/40 rounded-[24px] shadow-sm overflow-hidden flex flex-col min-h-[400px] relative">
         {/* Decorative background gradient */}
         <div className="absolute top-[-20%] left-[-10%] w-96 h-96 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-[-20%] right-[-10%] w-96 h-96 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
@@ -110,7 +110,7 @@ export default function AiAssistantPage() {
               <div className={`p-4 rounded-[16px] text-sm leading-relaxed shadow-sm ${
                 msg.role === "user" 
                   ? "bg-foreground text-background rounded-tr-sm whitespace-pre-wrap" 
-                  : "bg-white border border-black/5 text-foreground rounded-tl-sm backdrop-blur-md prose prose-sm max-w-none"
+                  : "bg-card border border-foreground/5 text-foreground rounded-tl-sm backdrop-blur-md prose prose-sm max-w-none"
               }`}>
                 {msg.role === "user" ? (
                   msg.content
@@ -125,7 +125,7 @@ export default function AiAssistantPage() {
               <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-primary to-primary/80 text-white flex items-center justify-center shadow-sm">
                 <Bot className="w-4.5 h-4.5" />
               </div>
-              <div className="p-4 bg-white border border-black/5 rounded-[16px] rounded-tl-sm flex items-center gap-3 shadow-sm">
+              <div className="p-4 bg-card border border-foreground/5 rounded-[16px] rounded-tl-sm flex items-center gap-3 shadow-sm">
                 <Loader2 className="w-4 h-4 text-primary animate-spin" />
                 <span className="text-sm font-medium bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/60">Thinking...</span>
               </div>
@@ -136,7 +136,7 @@ export default function AiAssistantPage() {
 
         {/* Suggestion Prompts */}
         {messages.length === 1 && (
-          <div className="p-5 bg-white/50 border-t border-black/5 backdrop-blur-md z-10">
+          <div className="p-5 bg-white/50 border-t border-foreground/5 backdrop-blur-md z-10">
             <p className="text-xs font-bold text-foreground/60 uppercase tracking-widest mb-3 flex items-center gap-1.5 ml-1">
               <Sparkles className="w-4 h-4 text-primary" />
               Try asking about
@@ -146,7 +146,7 @@ export default function AiAssistantPage() {
                 <button
                   key={s}
                   onClick={() => handleSendMessage(s)}
-                  className="group text-left px-4 py-3 bg-white border border-black/5 rounded-[12px] text-sm text-foreground/70 hover:text-foreground hover:border-primary/40 hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 cursor-pointer flex items-center gap-3"
+                  className="group text-left px-4 py-3 bg-card border border-foreground/5 rounded-[12px] text-sm text-foreground/70 hover:text-foreground hover:border-primary/40 hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 cursor-pointer flex items-center gap-3"
                 >
                   <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
                     <MessageSquare className="w-4 h-4" />
@@ -159,8 +159,8 @@ export default function AiAssistantPage() {
         )}
 
         {/* Input area */}
-        <div className="p-5 bg-white/80 border-t border-black/5 backdrop-blur-xl z-10">
-          <div className="relative flex items-center bg-white border border-black/10 rounded-full shadow-sm hover:border-primary/30 transition-colors focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/10">
+        <div className="p-5 bg-card/80 border-t border-foreground/5 backdrop-blur-xl z-10">
+          <div className="relative flex items-center bg-card border border-foreground/10 rounded-full shadow-sm hover:border-primary/30 transition-colors focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/10">
             <input
               type="text"
               aria-label="Ask Uki anything"

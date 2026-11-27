@@ -1,5 +1,6 @@
 'use client';
 
+import { activateOnKey } from '@/lib/a11y';
 import { useState } from 'react';
 import { Calendar, Check, Edit01 as Edit2, File04 as FileText, Plus, Trash01 as Trash2, XClose as X } from "@untitledui/icons";
 import { Whiteboard } from '../hooks/useWhiteboards';
@@ -52,6 +53,7 @@ export function WhiteboardList({
         </div>
         <button
           onClick={onCreateBoard}
+          role="button" tabIndex={0} onKeyDown={activateOnKey}
           className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-[10px] text-sm font-medium hover:opacity-90 transition-all cursor-pointer shadow-sm"
         >
           <Plus className="w-4 h-4" />
@@ -63,7 +65,8 @@ export function WhiteboardList({
         {/* Create new card */}
         <div
           onClick={onCreateBoard}
-          className="h-44 border-2 border-dashed border-border hover:border-primary/50 bg-[#FCFBFA]/50 rounded-[10px] flex flex-col items-center justify-center gap-3 cursor-pointer group transition-all"
+          role="button" tabIndex={0} onKeyDown={activateOnKey}
+          className="h-44 border-2 border-dashed border-border hover:border-primary/50 bg-[#FCFBFA]/50 dark:bg-muted rounded-[10px] flex flex-col items-center justify-center gap-3 cursor-pointer group transition-all"
         >
           <div className="p-3 bg-muted group-hover:bg-primary/10 rounded-full transition-colors">
             <Plus className="w-6 h-6 text-muted-foreground group-hover:text-primary" />
@@ -84,7 +87,8 @@ export function WhiteboardList({
             <div
               key={wb.id}
               onClick={() => !isRenaming && onSelectBoard(wb.id)}
-              className="h-44 border border-border bg-[#FCFBFA] hover:shadow-md rounded-[10px] p-4 flex flex-col justify-between cursor-pointer group relative transition-all"
+              role="button" tabIndex={0} onKeyDown={activateOnKey}
+              className="h-44 border border-border bg-[#FCFBFA] dark:bg-muted hover:shadow-md rounded-[10px] p-4 flex flex-col justify-between cursor-pointer group relative transition-all"
             >
               <div className="space-y-2 flex-1">
                 <div className="flex items-start justify-between">
@@ -128,16 +132,23 @@ export function WhiteboardList({
                       type="text"
                       value={renameText}
                       onChange={(e) => setRenameText(e.target.value)}
+                      aria-label="Whiteboard name"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') e.currentTarget.parentElement?.querySelector<HTMLButtonElement>('[aria-label="Save name"]')?.click();
+                        if (e.key === 'Escape') e.currentTarget.parentElement?.querySelector<HTMLButtonElement>('[aria-label="Cancel rename"]')?.click();
+                      }}
                       className="flex-1 min-w-0 px-2 py-1 border border-primary rounded-[6px] text-xs focus:outline-none focus:ring-1 focus:ring-ring"
                       autoFocus
                     />
                     <button
+                      aria-label="Save name"
                       onClick={(e) => saveRename(wb.id, e)}
                       className="p-1 bg-green-50 text-green-600 border border-green-200 rounded-[4px]"
                     >
                       <Check className="w-3.5 h-3.5" />
                     </button>
                     <button
+                      aria-label="Cancel rename"
                       onClick={cancelRename}
                       className="p-1 bg-destructive/10 text-destructive border border-destructive/20 rounded-[4px]"
                     >

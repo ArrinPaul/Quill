@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowDown, ArrowUp, Eye, EyeOff, Lock01 as Lock, Plus, Star01 as Unlock, Trash01 as Trash2 } from "@untitledui/icons";
+import { ArrowDown, ArrowUp, Eye, EyeOff, Lock01 as Lock, Plus, LockUnlocked01 as Unlock, Trash01 as Trash2 } from "@untitledui/icons";
 import { Layer } from '../hooks/useCanvasEngine';
 import { memo } from 'react';
 
@@ -38,7 +38,7 @@ export const LayerPanel = memo(function LayerPanel({
   };
 
   return (
-    <div className="w-64 border-l border-border bg-white flex flex-col h-full">
+    <div className="w-64 max-w-[85%] border-l border-border bg-card flex flex-col h-full max-sm:absolute max-sm:right-0 max-sm:top-0 max-sm:z-40 max-sm:shadow-lg">
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <h3 className="font-semibold text-sm">Layers</h3>
         <button

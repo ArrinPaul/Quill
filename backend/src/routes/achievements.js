@@ -14,7 +14,7 @@ router.get("/", async (req, res) => {
     // Fetch tasks
     const { data: tasks, error: taskError } = await supabase
       .from("tasks")
-      .select("status, deadline")
+      .select("status, deadline, completed_at")
       .eq("student_id", studentId);
     if (taskError) throw taskError;
 
@@ -58,7 +58,7 @@ router.get("/", async (req, res) => {
     tasks.forEach(t => {
       if (t.status === "completed") {
         completedTasks++;
-        if (new Date(t.deadline) > now) {
+        if (t.completed_at && new Date(t.completed_at) < new Date(t.deadline)) {
           earlyBirds++;
         }
       }

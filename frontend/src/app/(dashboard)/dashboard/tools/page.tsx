@@ -1,5 +1,6 @@
 "use client";
 
+import { useEscape } from "@/hooks/useEscape";
 import { useState, useEffect, useRef } from "react";
 import { Announcement01 as Megaphone, Calendar, Check, Copy01 as Copy, File04 as FileText, GitBranch01 as GitFork, Lightbulb01 as Lightbulb, Loading01 as Loader2, Shield02 as ShieldAlert, Stars01 as Sparkles, XClose as X, Upload01 as Upload, Download01 as Download } from "@untitledui/icons";
 import { api } from "@/lib/api";
@@ -32,7 +33,7 @@ const MermaidChart = ({ chart }: { chart: string }) => {
       }
     }
   }, [chart]);
-  return <div ref={ref} className="w-full flex justify-center my-6 overflow-x-auto bg-white p-6 md:p-10 rounded-[16px] border border-border shadow-sm" />;
+  return <div ref={ref} className="w-full flex justify-center my-6 overflow-x-auto bg-card p-6 md:p-10 rounded-[16px] border border-border shadow-sm" />;
 };
 
 interface Tool {
@@ -107,6 +108,7 @@ const TOOLS_CONFIG: Tool[] = [
 
 export default function SmartToolsPage() {
   const [activeTool, setActiveTool] = useState<Tool | null>(null);
+  useEscape(!!activeTool, () => setActiveTool(null));
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -257,7 +259,7 @@ export default function SmartToolsPage() {
           return (
             <div
               key={tool.slug}
-              className="bg-white border border-border rounded-[12px] p-6 shadow-sm transition-all hover:shadow-lg flex flex-col justify-between h-full"
+              className="bg-card border border-border rounded-[12px] p-6 shadow-sm transition-all hover:shadow-lg flex flex-col justify-between h-full"
             >
               <div>
                 <div className="w-12 h-12 rounded-[12px] bg-primary/10 border border-border flex items-center justify-center text-primary mb-4">
@@ -283,8 +285,8 @@ export default function SmartToolsPage() {
 
       {/* Modal Overlay */}
       {activeTool && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
-          <div className="bg-white rounded-[16px] border border-border shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6 md:p-8 flex flex-col">
+        <div role="dialog" aria-modal="true" className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-card rounded-[16px] border border-border shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6 md:p-8 flex flex-col">
             
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-border pb-4 mb-4">
@@ -446,7 +448,7 @@ export default function SmartToolsPage() {
                       
                     </div>
                   ) : (
-                    <div id="ai-output-content" className="bg-white border border-border rounded-[12px] p-6 md:p-8 text-base text-foreground max-h-[500px] overflow-y-auto shadow-inner prose prose-slate max-w-none prose-headings:text-primary prose-a:text-primary prose-li:my-0">
+                    <div id="ai-output-content" className="bg-card border border-border rounded-[12px] p-6 md:p-8 text-base text-foreground max-h-[500px] overflow-y-auto shadow-inner prose prose-slate max-w-none prose-headings:text-primary prose-a:text-primary prose-li:my-0">
                       <ReactMarkdown 
                         remarkPlugins={[remarkGfm]}
                         components={{

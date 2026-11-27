@@ -91,7 +91,7 @@ export function CampusNewsWidget({ isExpanded = false }: CampusNewsWidgetProps) 
 
   if (loading) {
     return (
-      <div className="bg-white border border-border rounded-[10px] p-5 h-full">
+      <div className="bg-card border border-border rounded-[10px] p-5 h-full">
         <div className="h-4 bg-muted rounded animate-pulse w-1/3 mb-4" />
         {[1, 2, 3].map((i) => (
           <div key={i} className="h-16 bg-muted rounded animate-pulse mb-2" />
@@ -104,7 +104,7 @@ export function CampusNewsWidget({ isExpanded = false }: CampusNewsWidgetProps) 
   const displayedNews = isExpanded ? news : news.slice(0, 3);
 
   return (
-    <div className="bg-white border border-border rounded-[10px] p-5 card-hover h-full flex flex-col">
+    <div className="bg-card border border-border rounded-[10px] p-5 card-hover h-full flex flex-col">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-[10px] bg-primary/10 flex items-center justify-center">

@@ -1,5 +1,6 @@
 'use client';
 
+import { useEscape } from "@/hooks/useEscape";
 import { useState, useEffect } from 'react';
 import { useWhiteboards } from '@/features/whiteboard/hooks/useWhiteboards';
 import { WhiteboardList } from '@/features/whiteboard/components/WhiteboardList';
@@ -22,6 +23,8 @@ export default function WhiteboardPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [newBoardTitle, setNewBoardTitle] = useState('New Whiteboard');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  useEscape(isCreateModalOpen, () => setIsCreateModalOpen(false));
+  useEscape(!!deleteConfirmId, () => setDeleteConfirmId(null));
 
   useEffect(() => {
     fetchWhiteboards();
@@ -97,8 +100,8 @@ export default function WhiteboardPage() {
 
       {/* Create Whiteboard In-App Modal */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
-          <div className="bg-white rounded-[12px] border border-border shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 flex flex-col">
+        <div role="dialog" aria-modal="true" className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-card rounded-[12px] border border-border shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 flex flex-col">
             <div className="flex items-center justify-between border-b border-border pb-4 mb-4">
               <h2 className="text-lg font-bold text-foreground">Create New Whiteboard</h2>
             </div>
@@ -137,8 +140,8 @@ export default function WhiteboardPage() {
 
       {/* Delete Confirmation In-App Modal */}
       {deleteConfirmId && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
-          <div className="bg-white rounded-[12px] border border-border shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 flex flex-col">
+        <div role="dialog" aria-modal="true" className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-card rounded-[12px] border border-border shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 flex flex-col">
             <div className="flex items-center justify-between border-b border-border pb-4 mb-4">
               <h2 className="text-lg font-bold text-foreground">Delete Whiteboard</h2>
             </div>

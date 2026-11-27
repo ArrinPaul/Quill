@@ -15,7 +15,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "Quill — AI-Powered Student Hub",
-  description: "Never miss a deadline again. Smart reminders, AI summaries, and attendance tracking.",
+  description: "Never miss a deadline again. Deadline tracking, AI summaries, and attendance tracking.",
 };
 
 export default function RootLayout({
@@ -26,8 +26,17 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={cn("h-full", "antialiased", inter.variable, "font-sans", geist.variable)}
     >
+      <head>
+        {/* Apply the saved or system theme before first paint to avoid a flash */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var t=localStorage.getItem("Quill_theme");if(t==="dark"||(!t&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch(e){}`,
+          }}
+        />
+      </head>
       <body className="min-h-full flex flex-col">
         <AuthProvider>{children}</AuthProvider>
         <Toaster richColors position="top-center" />

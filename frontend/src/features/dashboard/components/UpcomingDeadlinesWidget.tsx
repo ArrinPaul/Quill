@@ -4,17 +4,13 @@ import Link from "next/link";
 import { ArrowRight, Clock, Plus, Stars01 as PartyPopper, Calendar } from "@untitledui/icons";
 import type { Task } from "@/features/types";
 import { generateGoogleCalendarUrl } from "@/lib/calendar";
+import { daysUntil } from "@/lib/utils";
 
 interface UpcomingDeadlinesWidgetProps {
   tasks: Task[];
 }
 
-function getDaysLeft(deadline: string): number {
-  const now = new Date();
-  const dl = new Date(deadline);
-  const diff = dl.getTime() - now.getTime();
-  return Math.ceil(diff / (1000 * 60 * 60 * 24));
-}
+const getDaysLeft = (deadline: string) => daysUntil(deadline);
 
 function getDaysLabel(days: number): string {
   if (days < 0) return "Overdue";
@@ -31,19 +27,14 @@ function getDaysColor(days: number): string {
 }
 
 export function UpcomingDeadlinesWidget({ tasks = [] }: UpcomingDeadlinesWidgetProps) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const nextWeek = new Date(today);
-  nextWeek.setDate(nextWeek.getDate() + 7);
-
   const upcomingTasks = tasks.filter((task) => {
-    if (task.status === "completed") return false;
-    const taskDate = new Date(task.deadline);
-    return taskDate >= today && taskDate <= nextWeek;
+    if (task.status === "completed" || task.status === "cancelled") return false;
+    const days = daysUntil(task.deadline);
+    return days >= 0 && days <= 7;
   });
 
   return (
-    <div className="bg-white border border-border rounded-[10px] p-5 card-hover h-full">
+    <div className="bg-card border border-border rounded-[10px] p-5 card-hover h-full">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-[10px] bg-primary/10 flex items-center justify-center">

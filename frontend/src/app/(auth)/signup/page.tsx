@@ -98,7 +98,7 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="bg-white rounded-[10px] border border-border p-5 sm:p-6 shadow-sm w-full">
+    <div className="bg-card rounded-[10px] border border-border p-5 sm:p-6 shadow-sm w-full">
       {/* Progress Indicator */}
       <div className="flex gap-2 mb-4">
         <div className={`h-1.5 flex-1 rounded-full transition-colors ${step >= 1 ? "bg-primary" : "bg-muted"}`} />
@@ -108,10 +108,10 @@ export default function SignupPage() {
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-foreground" style={{ letterSpacing: "-0.02em" }}>
-            {step === 1 ? "Account Credentials" : step === 2 ? "Personal Info" : "Telegram Sync"}
+            {step === 1 ? "Account Credentials" : "Personal Info"}
           </h1>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {step === 1 ? "Step 1 of 3" : step === 2 ? "Step 2 of 3" : "Final Step"}
+            {step === 1 ? "Step 1 of 2" : "Step 2 of 2"}
           </p>
         </div>
         {step > 1 && (
@@ -235,7 +235,7 @@ export default function SignupPage() {
                   name="branch"
                   value={form.branch}
                   onChange={handleChange}
-                  className="w-full px-3 py-1.5 border border-border rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white"
+                  className="w-full px-3 py-1.5 border border-border rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-card"
                   required
                 >
                   <option value="">Select</option>
@@ -254,7 +254,7 @@ export default function SignupPage() {
                   name="year"
                   value={form.year}
                   onChange={handleChange}
-                  className="w-full px-3 py-1.5 border border-border rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white"
+                  className="w-full px-3 py-1.5 border border-border rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-card"
                   required
                 >
                   <option value="">Select</option>

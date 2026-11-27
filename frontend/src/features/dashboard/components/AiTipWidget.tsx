@@ -26,7 +26,7 @@ export function AiTipWidget() {
   };
 
   return (
-    <div className="bg-white border border-border rounded-[10px] p-5 card-hover h-full">
+    <div className="bg-card border border-border rounded-[10px] p-5 card-hover h-full">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-[10px] bg-primary/10 flex items-center justify-center">

@@ -13,6 +13,10 @@ export function useAutoSave(
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isInitial = useRef(true);
+  const pendingSave = useRef<(() => Promise<void>) | null>(null);
+
+  // Flush an unsaved change when the editor closes or switches boards
+  useEffect(() => () => { void pendingSave.current?.(); }, [whiteboardId]);
 
   useEffect(() => {
     isInitial.current = true;
@@ -31,7 +35,8 @@ export function useAutoSave(
 
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
 
-    timeoutRef.current = setTimeout(async () => {
+    const save = async () => {
+      pendingSave.current = null;
       try {
         await api.put(`/api/whiteboards/${whiteboardId}`, {
           title,
@@ -42,7 +47,9 @@ export function useAutoSave(
         console.error('Failed to auto-save whiteboard:', err);
         setSaveStatus('error');
       }
-    }, 3000);
+    };
+    pendingSave.current = save;
+    timeoutRef.current = setTimeout(save, 3000);
 
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);

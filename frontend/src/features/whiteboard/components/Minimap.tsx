@@ -97,7 +97,7 @@ export function Minimap({ shapes, viewport, onSetViewport, parentCanvas }: Minim
   };
 
   return (
-    <div className="absolute bottom-12 right-4 bg-white border border-border shadow-md rounded-[10px] overflow-hidden select-none z-30">
+    <div className="absolute bottom-12 right-4 bg-card border border-border shadow-md rounded-[10px] overflow-hidden select-none z-30">
       <div className="bg-muted px-2 py-1 text-[9px] font-semibold text-muted-foreground border-b border-border flex justify-between">
         <span>MINIMAP</span>
       </div>

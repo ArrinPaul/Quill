@@ -46,7 +46,7 @@ export const WhiteboardToolbar = memo(function WhiteboardToolbar({
   onGroupSelected, onUngroupSelected, onToggleShortcuts,
 }: ToolbarProps) {
   return (
-    <div className="flex items-center gap-1 px-3 py-2 bg-white border-b border-border flex-wrap">
+    <div className="flex items-center gap-1 px-3 py-2 bg-card border-b border-border flex-wrap">
       <div className="flex items-center gap-1">
         {TOOL_LIST.map(t => (
           <button

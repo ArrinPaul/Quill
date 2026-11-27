@@ -1,6 +1,7 @@
 const jwt = require("jsonwebtoken");
+const { getClient } = require("../services/supabase");
 
-function authMiddleware(req, res, next) {
+async function authMiddleware(req, res, next) {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -10,7 +11,7 @@ function authMiddleware(req, res, next) {
   const token = authHeader.split(" ")[1];
 
   // Developer mode bypass
-  if (process.env.DEV_MODE === "true" && token === "dev-token") {
+  if (process.env.DEV_MODE === "true" && process.env.NODE_ENV !== "production" && token === "dev-token") {
     req.student = {
       id: "00000000-0000-0000-0000-000000000000",
       name: "Developer",
@@ -25,6 +26,13 @@ function authMiddleware(req, res, next) {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.purpose) throw new Error("Not a session token");
+
+    // Reject tokens that outlive a deleted account
+    const { data, error } = await getClient().from("students").select("id").eq("id", decoded.id).maybeSingle();
+    if (error) return res.status(503).json({ message: "Could not verify your session. Please try again." });
+    if (!data) return res.status(401).json({ message: "Account no longer exists" });
+
     req.student = decoded;
     next();
   } catch (error) {

@@ -29,10 +29,12 @@ export function FocusTimerWidget() {
     return () => clearTimer();
   }, [clearTimer]);
 
-  const completeSession = () => {
-    setSessionsCompleted((s) => s + 1);
-    const minutes = Math.round(maxSeconds / 60);
-    api.post("/api/activity/focus", { minutes }).catch(console.error);
+  const completeSession = (elapsedSeconds = maxSeconds) => {
+    const minutes = Math.floor(elapsedSeconds / 60);
+    if (minutes > 0) {
+      setSessionsCompleted((s) => s + 1);
+      api.post("/api/activity/focus", { minutes }).catch(console.error);
+    }
     setIsBreak(true);
     setTotalSeconds(breakLength * 60);
     setMaxSeconds(breakLength * 60);
@@ -87,7 +89,7 @@ export function FocusTimerWidget() {
     e?.stopPropagation();
     setIsRunning(false);
     if (!isBreak) {
-      completeSession();
+      completeSession(Math.max(0, maxSeconds - totalSeconds));
     } else {
       setIsBreak(false);
       setTotalSeconds(sessionLength * 60);
@@ -176,7 +178,7 @@ export function FocusTimerWidget() {
 
           <div className="w-full h-1 bg-white/15 rounded-full mb-4 overflow-hidden">
             <div
-              className="h-full bg-white rounded-full transition-all duration-1000"
+              className="h-full bg-card rounded-full transition-all duration-1000"
               style={{ width: `${progress}%` }}
             />
           </div>
@@ -191,7 +193,7 @@ export function FocusTimerWidget() {
             </button>
             <button
               onClick={isRunning ? handlePause : handlePlay}
-              className="w-14 h-14 rounded-[10px] bg-white flex items-center justify-center text-primary hover:shadow-lg transition-all hover:scale-105"
+              className="w-14 h-14 rounded-[10px] bg-card flex items-center justify-center text-primary hover:shadow-lg transition-all hover:scale-105"
               aria-label={isRunning ? "Pause timer" : "Start timer"}
             >
               {isRunning ? (
@@ -259,7 +261,7 @@ export function FocusTimerWidget() {
                   </div>
                   <button 
                     onClick={() => setShowSettings(false)}
-                    className="w-full py-3 bg-white text-primary font-bold rounded-[12px] hover:bg-white/90 transition-colors mt-4"
+                    className="w-full py-3 bg-card text-primary font-bold rounded-[12px] hover:bg-card/90 transition-colors mt-4"
                   >
                     Done
                   </button>
@@ -287,7 +289,7 @@ export function FocusTimerWidget() {
                   <div className="w-full max-w-2xl mt-16 mb-12">
                     <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-white rounded-full transition-all duration-1000 ease-linear"
+                        className="h-full bg-card rounded-full transition-all duration-1000 ease-linear"
                         style={{ width: `${progress}%` }}
                       />
                     </div>
@@ -302,7 +304,7 @@ export function FocusTimerWidget() {
                     </button>
                     <button
                       onClick={isRunning ? handlePause : handlePlay}
-                      className="w-24 h-24 rounded-full bg-white flex items-center justify-center text-primary hover:shadow-[0_0_40px_rgba(255,255,255,0.3)] transition-all hover:scale-105"
+                      className="w-24 h-24 rounded-full bg-card flex items-center justify-center text-primary hover:shadow-[0_0_40px_rgba(255,255,255,0.3)] transition-all hover:scale-105"
                     >
                       {isRunning ? (
                         <Pause className="w-10 h-10" />

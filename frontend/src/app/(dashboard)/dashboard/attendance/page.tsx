@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BarChart01 as BarChart3, CheckCircle, Loading01 as Loader2, Plus, RefreshCcw01 as RefreshCw, Shield02 as ShieldAlert, Stars01 as Sparkles, Trash01 as Trash2 } from "@untitledui/icons";
 import { api } from "@/lib/api";
 import type { Attendance } from "@/features/types";
@@ -134,7 +134,11 @@ export default function AttendancePage() {
     setAnalyzingId(null);
   };
 
+  const savingIds = useRef(new Set<string>());
+
   const handleQuickUpdate = async (record: Attendance, type: "attended" | "missed") => {
+    if (savingIds.current.has(record.id)) return;
+    savingIds.current.add(record.id);
     const newTotal = record.total_classes + 1;
     const newAttended = type === "attended" ? record.attended_classes + 1 : record.attended_classes;
     
@@ -150,7 +154,7 @@ export default function AttendancePage() {
     );
 
     try {
-      const res = await api.post<{ attendance: Attendance }>("/api/attendance", {
+      await api.post<{ attendance: Attendance }>("/api/attendance", {
         subject: record.subject,
         total_classes: newTotal,
         attended_classes: newAttended,
@@ -161,6 +165,8 @@ export default function AttendancePage() {
     } catch (err) {
       setRecords((prev) => prev.map((r) => (r.id === record.id ? record : r)));
       setFormError(err instanceof Error ? err.message : "Failed to update attendance");
+    } finally {
+      savingIds.current.delete(record.id);
     }
   };
 
@@ -193,7 +199,7 @@ export default function AttendancePage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0 overflow-y-auto pb-6 pr-1">
         {/* Attendance Form */}
-        <div className="bg-white/60 backdrop-blur-xl border border-white/40 rounded-[24px] p-6 shadow-sm h-fit relative overflow-hidden">
+        <div className="bg-card/60 backdrop-blur-xl border border-white/40 rounded-[24px] p-6 shadow-sm h-fit relative overflow-hidden">
           <div className="absolute top-[-20%] left-[-20%] w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
           <h3 className="font-bold text-foreground text-lg mb-5 flex items-center gap-2 relative z-10">
             <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center">
@@ -210,7 +216,7 @@ export default function AttendancePage() {
                 type="text"
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
-                className="w-full px-4 py-3 bg-white/80 border border-black/5 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all placeholder:text-muted-foreground/60 shadow-sm"
+                className="w-full px-4 py-3 bg-card/80 border border-foreground/5 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all placeholder:text-muted-foreground/60 shadow-sm"
                 placeholder="e.g., OS, DBMS, Networks"
                 required
               />
@@ -225,7 +231,7 @@ export default function AttendancePage() {
                   min="0"
                   value={totalClasses}
                   onChange={(e) => setTotalClasses(e.target.value === "" ? "" : Number(e.target.value))}
-                  className="w-full px-4 py-3 bg-white/80 border border-black/5 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all shadow-sm"
+                  className="w-full px-4 py-3 bg-card/80 border border-foreground/5 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all shadow-sm"
                   placeholder="0"
                   required
                 />
@@ -239,7 +245,7 @@ export default function AttendancePage() {
                   min="0"
                   value={attendedClasses}
                   onChange={(e) => setAttendedClasses(e.target.value === "" ? "" : Number(e.target.value))}
-                  className="w-full px-4 py-3 bg-white/80 border border-black/5 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all shadow-sm"
+                  className="w-full px-4 py-3 bg-card/80 border border-foreground/5 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all shadow-sm"
                   placeholder="0"
                   required
                 />
@@ -255,7 +261,7 @@ export default function AttendancePage() {
                 max="100"
                 value={threshold}
                 onChange={(e) => setThreshold(Number(e.target.value))}
-                className="w-full px-4 py-3 bg-white/80 border border-black/5 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all shadow-sm"
+                className="w-full px-4 py-3 bg-card/80 border border-foreground/5 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all shadow-sm"
                 placeholder="75"
               />
             </div>
@@ -276,13 +282,13 @@ export default function AttendancePage() {
         {/* Attendance Records List */}
         <div className="lg:col-span-2 space-y-5">
           {loading ? (
-            <div className="flex flex-col items-center justify-center py-24 bg-white/60 backdrop-blur-xl border border-white/40 rounded-[24px]">
+            <div className="flex flex-col items-center justify-center py-24 bg-card/60 backdrop-blur-xl border border-white/40 rounded-[24px]">
               <Loader2 className="w-8 h-8 text-primary animate-spin mb-3" />
               <p className="text-sm font-medium text-muted-foreground">Loading attendance...</p>
             </div>
           ) : records.length === 0 ? (
-            <div className="bg-white/60 backdrop-blur-xl border border-white/40 rounded-[24px] p-16 text-center shadow-sm flex flex-col items-center justify-center h-full min-h-[400px]">
-              <div className="w-16 h-16 rounded-full bg-black/5 flex items-center justify-center mb-5">
+            <div className="bg-card/60 backdrop-blur-xl border border-white/40 rounded-[24px] p-16 text-center shadow-sm flex flex-col items-center justify-center h-full min-h-[400px]">
+              <div className="w-16 h-16 rounded-full bg-foreground/5 flex items-center justify-center mb-5">
                 <BarChart3 className="w-8 h-8 text-muted-foreground/60" />
               </div>
               <h3 className="text-xl font-bold text-foreground mb-2">No attendance records</h3>
@@ -302,7 +308,7 @@ export default function AttendancePage() {
                 return (
                   <div
                     key={record.id}
-                    className={`bg-gradient-to-br from-white/90 to-white/50 backdrop-blur-xl border rounded-[20px] p-6 shadow-sm flex flex-col sm:flex-row items-start justify-between gap-5 transition-all hover:shadow-md hover:-translate-y-0.5 ${
+                    className={`bg-gradient-to-br from-white/90 dark:from-card to-white/50 dark:to-card backdrop-blur-xl border rounded-[20px] p-6 shadow-sm flex flex-col sm:flex-row items-start justify-between gap-5 transition-all hover:shadow-md hover:-translate-y-0.5 ${
                       isUnderThreshold ? "border-destructive/20" : "border-white/40"
                     }`}
                   >
@@ -316,7 +322,7 @@ export default function AttendancePage() {
                         }`}>
                           {percentage}%
                         </span>
-                        <span className="text-xs font-medium text-muted-foreground bg-black/5 px-2.5 py-1 rounded-full">
+                        <span className="text-xs font-medium text-muted-foreground bg-foreground/5 px-2.5 py-1 rounded-full">
                           Goal: {record.threshold}%
                         </span>
                       </div>
@@ -328,7 +334,7 @@ export default function AttendancePage() {
                             <strong>{record.attended_classes}</strong> / {record.total_classes} classes
                           </span>
                         </div>
-                        <div className="w-full bg-black/5 rounded-full h-2.5 overflow-hidden border border-black/5">
+                        <div className="w-full bg-foreground/5 rounded-full h-2.5 overflow-hidden border border-foreground/5">
                           <div
                             className={`h-full rounded-full transition-all duration-700 ease-out ${
                               isUnderThreshold ? "bg-gradient-to-r from-destructive to-destructive/70" : "bg-gradient-to-r from-green-500 to-green-400"
@@ -380,13 +386,13 @@ export default function AttendancePage() {
                       )}
                     </div>
 
-                    <div className="flex sm:flex-col items-center justify-start gap-2 flex-shrink-0 w-full sm:w-auto mt-2 sm:mt-0 border-t sm:border-t-0 sm:border-l border-black/5 pt-3 sm:pt-0 sm:pl-3">
+                    <div className="flex sm:flex-col items-center justify-start gap-2 flex-shrink-0 w-full sm:w-auto mt-2 sm:mt-0 border-t sm:border-t-0 sm:border-l border-foreground/5 pt-3 sm:pt-0 sm:pl-3">
                       <button
                         type="button"
                         aria-label={`Recheck risk assessment for ${record.subject}`}
                         onClick={() => handleRefreshAlert(record)}
                         disabled={analyzingId === record.id}
-                        className="p-2 w-full sm:w-auto hover:bg-black/5 rounded-[12px] text-muted-foreground hover:text-foreground transition-all cursor-pointer flex items-center justify-center"
+                        className="p-2 w-full sm:w-auto hover:bg-foreground/5 rounded-[12px] text-muted-foreground hover:text-foreground transition-all cursor-pointer flex items-center justify-center"
                         title="Recheck risk assessment"
                       >
                         <RefreshCw className={`w-4.5 h-4.5 ${analyzingId === record.id ? "animate-spin" : ""}`} />

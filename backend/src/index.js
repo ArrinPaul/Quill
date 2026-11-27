@@ -1,5 +1,7 @@
-require("dotenv").config();
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+const path = require("path");
+// Load backend/.env if present, then fall back to the repo-root .env
+require("dotenv").config({ path: path.resolve(__dirname, "../.env") });
+require("dotenv").config({ path: path.resolve(__dirname, "../../.env") });
 const express = require("express");
 const cors = require("cors");
 
@@ -9,7 +11,6 @@ const noticeRoutes = require("./routes/notices");
 const attendanceRoutes = require("./routes/attendance");
 const aiRoutes = require("./routes/ai");
 const quizRoutes = require("./routes/quizzes");
-const googleRoutes = require("./routes/google");
 const whiteboardRoutes = require("./routes/whiteboards");
 const calendarRoutes = require("./routes/calendar");
 const flashcardsRoutes = require("./routes/flashcards");
@@ -19,7 +20,11 @@ const activityRoutes = require("./routes/activity");
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-app.use(cors());
+// Only the web app's own origin(s) may call the API from a browser. Comma-separate to allow several.
+const allowedOrigins = (process.env.FRONTEND_URL || "http://localhost:3000")
+  .split(",")
+  .map((origin) => origin.trim().replace(/\/$/, ""));
+app.use(cors({ origin: allowedOrigins }));
 app.use(express.json());
 
 app.use("/api/auth", authRoutes);
@@ -28,7 +33,6 @@ app.use("/api/notices", noticeRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/quizzes", quizRoutes);
-app.use("/api/auth/google", googleRoutes);
 app.use("/api/whiteboards", whiteboardRoutes);
 app.use("/api/calendar", calendarRoutes);
 app.use("/api/flashcards", flashcardsRoutes);

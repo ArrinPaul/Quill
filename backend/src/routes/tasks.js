@@ -68,7 +68,7 @@ router.post("/", async (req, res) => {
   try {
     const { title, subject, description, deadline, reminder_time, add_to_calendar } = req.body;
 
-    if (!title || !subject || !deadline) {
+    if (!title?.trim() || !subject?.trim() || !deadline || Number.isNaN(Date.parse(deadline))) {
       return res.status(400).json({ message: "Title, subject, and deadline are required" });
     }
 
@@ -100,7 +100,21 @@ router.put("/:id", async (req, res) => {
   try {
     const { title, subject, description, deadline, reminder_time, status } = req.body;
 
+    if ((title !== undefined && !title?.trim()) || (subject !== undefined && !subject?.trim())) {
+      return res.status(400).json({ message: "Title and subject cannot be blank" });
+    }
+
     const updatePayload = { title, subject, description, deadline, status };
+    if (status !== undefined) {
+      const { data: current } = await getClient()
+        .from("tasks")
+        .select("status")
+        .eq("id", req.params.id)
+        .eq("student_id", req.student.id)
+        .maybeSingle();
+      if (status !== "completed") updatePayload.completed_at = null;
+      else if (current && current.status !== "completed") updatePayload.completed_at = new Date().toISOString();
+    }
     if (reminder_time !== undefined) {
       updatePayload.reminder_time = reminder_time;
     }

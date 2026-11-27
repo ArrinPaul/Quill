@@ -1,8 +1,10 @@
 "use client";
 
+import { useEscape } from "@/hooks/useEscape";
 import { useEffect, useState } from "react";
 import { ArrowLeft, Bell01 as Bell, Calendar, Check, Edit01 as Edit2, List as ListTodo, Loading01 as Loader2, Plus, Trash01 as Trash2, XClose as X } from "@untitledui/icons";
 import { api } from "@/lib/api";
+import { daysUntil } from "@/lib/utils";
 import { motion } from "framer-motion";
 import type { Task, TaskStatus } from "@/features/types";
 import { generateGoogleCalendarUrl } from "@/lib/calendar";
@@ -14,6 +16,7 @@ export default function TasksPage() {
   
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
+  useEscape(isModalOpen, () => setIsModalOpen(false));
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   
@@ -23,7 +26,6 @@ export default function TasksPage() {
   const [description, setDescription] = useState("");
   const [deadline, setDeadline] = useState("");
   const [reminderTime, setReminderTime] = useState("");
-  const [addToCalendar, setAddToCalendar] = useState(true);
   const [status, setStatus] = useState<TaskStatus>("pending");
   
   const [formError, setFormError] = useState("");
@@ -46,41 +48,37 @@ export default function TasksPage() {
     fetchTasks();
   }, []);
 
-  // Update reminder time automatically when deadline changes
-  useEffect(() => {
-    if (deadline && !reminderTime) {
-      const deadlineDate = new Date(deadline);
-      const reminderDate = new Date(deadlineDate.getTime() - 24 * 60 * 60 * 1000); // 24 hours before
-      
-      // Format to yyyy-MM-ddThh:mm for datetime-local input
-      try {
-        const offset = reminderDate.getTimezoneOffset();
-        const localReminder = new Date(reminderDate.getTime() - offset * 60 * 1000);
-        setReminderTime(localReminder.toISOString().slice(0, 16));
-      } catch (e) {
-        // ignore invalid dates
-      }
-    }
-  }, [deadline]);
+  const dayBefore = (value: string) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    const reminder = new Date(date.getTime() - 24 * 60 * 60 * 1000);
+    return new Date(reminder.getTime() - reminder.getTimezoneOffset() * 60 * 1000).toISOString().slice(0, 16);
+  };
+
+  const handleDeadlineChange = (value: string) => {
+    const isAutomatic = !reminderTime || reminderTime === dayBefore(deadline);
+    const reminderIsLate = !!reminderTime && !!value && reminderTime > value;
+    setDeadline(value);
+    if (isAutomatic || reminderIsLate) setReminderTime(dayBefore(value));
+  };
 
   // Filters logic
   const filteredTasks = tasks.filter((task) => {
     if (activeFilter === "completed") return task.status === "completed";
-    if (task.status === "completed" && activeFilter !== "all") return false; // hide completed in other lists
+    if ((task.status === "completed" || task.status === "cancelled") && activeFilter !== "all") return false; // hide completed in other lists
     
     const taskDate = new Date(task.deadline);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    const nextWeek = new Date(today);
-    nextWeek.setDate(nextWeek.getDate() + 7);
 
     if (activeFilter === "today") {
       return taskDate >= today && taskDate < tomorrow;
     }
     if (activeFilter === "upcoming") {
-      return taskDate >= today && taskDate <= nextWeek;
+      const days = daysUntil(task.deadline);
+      return days >= 0 && days <= 7;
     }
     return true;
   });
@@ -93,7 +91,6 @@ export default function TasksPage() {
     setDescription("");
     setDeadline("");
     setReminderTime("");
-    setAddToCalendar(true);
     setStatus("pending");
     setFormError("");
     setIsModalOpen(true);
@@ -120,8 +117,6 @@ export default function TasksPage() {
     } else {
       setReminderTime("");
     }
-    
-    setAddToCalendar(task.add_to_calendar);
     setStatus(task.status);
     setFormError("");
     setIsModalOpen(true);
@@ -131,7 +126,7 @@ export default function TasksPage() {
     e.preventDefault();
     setFormError("");
     
-    if (!title || !subject || !deadline) {
+    if (!title.trim() || !subject.trim() || !deadline) {
       setFormError("Title, Subject and Deadline are required");
       return;
     }
@@ -147,7 +142,6 @@ export default function TasksPage() {
         description: description || null,
         deadline: deadlineISO,
         reminder_time: reminderISO,
-        add_to_calendar: addToCalendar,
         status
       };
 
@@ -190,10 +184,7 @@ export default function TasksPage() {
   };
 
   const getDaysLeft = (deadlineStr: string) => {
-    const now = new Date();
-    const dl = new Date(deadlineStr);
-    const diff = dl.getTime() - now.getTime();
-    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+    const days = daysUntil(deadlineStr);
     
     if (days < 0) return "Overdue";
     if (days === 0) return "Due today";
@@ -248,7 +239,7 @@ export default function TasksPage() {
             <p className="text-sm text-muted-foreground">Loading tasks...</p>
           </div>
         ) : filteredTasks.length === 0 ? (
-          <div className="bg-white border border-border rounded-[10px] p-12 text-center shadow-sm max-w-md mx-auto mt-10">
+          <div className="bg-card border border-border rounded-[10px] p-12 text-center shadow-sm max-w-md mx-auto mt-10">
             <ListTodo className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-foreground mb-2">No tasks found</h3>
             <p className="text-sm text-muted-foreground mb-4">
@@ -271,7 +262,7 @@ export default function TasksPage() {
             {filteredTasks.map((task) => (
               <div
                 key={task.id}
-              className={`bg-white border rounded-[10px] p-5 shadow-sm transition-all hover:shadow-md flex items-start gap-4 ${
+              className={`bg-card border rounded-[10px] p-5 shadow-sm transition-all hover:shadow-md flex items-start gap-4 ${
                 task.status === "completed" ? "opacity-75 border-green-200 bg-green-50/10" : "border-border"
               }`}
             >
@@ -356,11 +347,6 @@ export default function TasksPage() {
                       </span>
                     </div>
                   )}
-                  {task.add_to_calendar && (
-                    <span className="px-2 py-0.5 bg-blue-500/10 text-blue-600 rounded-[10px] font-medium">
-                      Google Calendar Linked
-                    </span>
-                  )}
                 </div>
               </div>
             </div>
@@ -371,19 +357,19 @@ export default function TasksPage() {
 
       {/* Task Form Modal */}
       {isModalOpen && (
-        <div
+        <div role="dialog" aria-modal="true"
           className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-in fade-in zoom-in-95 duration-200"
           onClick={() => setIsModalOpen(false)}
         >
           <div
             role="dialog"
             aria-modal="true"
-            className="bg-white rounded-[24px] border border-black/5 shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto overflow-x-hidden flex flex-col relative"
+            className="bg-card rounded-[24px] border border-foreground/5 shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto overflow-x-hidden flex flex-col relative"
             onClick={(e) => e.stopPropagation()}
           >
             
             {/* Header */}
-            <div className="flex items-center justify-between p-6 pb-4 border-b border-black/5 bg-gradient-to-r from-primary/5 to-transparent">
+            <div className="flex items-center justify-between p-6 pb-4 border-b border-foreground/5 bg-gradient-to-r from-primary/5 to-transparent">
               <div>
                 <h2 className="text-xl font-bold tracking-tight text-foreground">
                   {isEditing ? "Edit Task" : "Create New Task"}
@@ -396,7 +382,7 @@ export default function TasksPage() {
                 type="button"
                 aria-label="Close task modal"
                 onClick={() => setIsModalOpen(false)}
-                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-black/5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-foreground/5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -419,7 +405,7 @@ export default function TasksPage() {
                     type="text"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    className="w-full px-4 py-3 bg-muted/30 border border-black/10 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all placeholder:text-muted-foreground/60 shadow-sm"
+                    className="w-full px-4 py-3 bg-muted/30 border border-foreground/10 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all placeholder:text-muted-foreground/60 shadow-sm"
                     placeholder="e.g., DBMS Assignment 2"
                     required
                   />
@@ -434,7 +420,7 @@ export default function TasksPage() {
                       type="text"
                       value={subject}
                       onChange={(e) => setSubject(e.target.value)}
-                      className="w-full px-4 py-3 bg-muted/30 border border-black/10 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all placeholder:text-muted-foreground/60 shadow-sm"
+                      className="w-full px-4 py-3 bg-muted/30 border border-foreground/10 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all placeholder:text-muted-foreground/60 shadow-sm"
                       placeholder="e.g., DBMS"
                       required
                     />
@@ -448,7 +434,7 @@ export default function TasksPage() {
                       <select
                         value={status}
                         onChange={(e) => setStatus(e.target.value as TaskStatus)}
-                        className="w-full px-4 py-3 bg-muted/30 border border-black/10 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all cursor-pointer shadow-sm appearance-none"
+                        className="w-full px-4 py-3 bg-muted/30 border border-foreground/10 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all cursor-pointer shadow-sm appearance-none"
                         style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1em' }}
                       >
                         <option value="pending">Pending</option>
@@ -466,7 +452,7 @@ export default function TasksPage() {
                   <textarea
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    className="w-full h-28 px-4 py-3 bg-muted/30 border border-black/10 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all resize-none placeholder:text-muted-foreground/60 shadow-sm scrollbar-thin"
+                    className="w-full h-28 px-4 py-3 bg-muted/30 border border-foreground/10 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all resize-none placeholder:text-muted-foreground/60 shadow-sm scrollbar-thin"
                     placeholder="Additional assignment details, submission link, etc."
                   />
                 </div>
@@ -479,45 +465,30 @@ export default function TasksPage() {
                     <input
                       type="datetime-local"
                       value={deadline}
-                      onChange={(e) => setDeadline(e.target.value)}
-                      className="w-full px-4 py-3 bg-muted/30 border border-black/10 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all shadow-sm"
+                      onChange={(e) => handleDeadlineChange(e.target.value)}
+                      className="w-full px-4 py-3 bg-muted/30 border border-foreground/10 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all shadow-sm"
                       required
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-foreground/80 mb-2 flex items-center gap-2">
-                      Telegram Reminder
+                      Reminder
                       <Bell className="w-3.5 h-3.5 text-secondary" />
                     </label>
                     <input
                       type="datetime-local"
                       value={reminderTime}
                       onChange={(e) => setReminderTime(e.target.value)}
-                      className="w-full px-4 py-3 bg-muted/30 border border-black/10 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all shadow-sm"
+                      className="w-full px-4 py-3 bg-muted/30 border border-foreground/10 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all shadow-sm"
                     />
                   </div>
                 </div>
 
-                <div className="flex items-start gap-3 pt-3">
-                  <div className="flex items-center h-5 mt-0.5">
-                    <input
-                      id="add-to-calendar"
-                      type="checkbox"
-                      checked={addToCalendar}
-                      onChange={(e) => setAddToCalendar(e.target.checked)}
-                      className="w-4.5 h-4.5 rounded border-black/20 text-primary focus:ring-primary/20 transition-all cursor-pointer"
-                    />
-                  </div>
-                  <label htmlFor="add-to-calendar" className="text-sm font-medium text-foreground/80 cursor-pointer select-none leading-snug">
-                    Sync with <span className="text-blue-600 font-semibold">Google Calendar</span> & trigger Telegram automations
-                  </label>
-                </div>
-
-                <div className="flex gap-3 justify-end pt-6 mt-6 border-t border-black/5">
+                <div className="flex gap-3 justify-end pt-6 mt-6 border-t border-foreground/5">
                   <button
                     type="button"
                     onClick={() => setIsModalOpen(false)}
-                    className="px-5 py-2.5 bg-white border border-black/10 text-foreground font-semibold rounded-[12px] hover:bg-accent hover:border-black/20 transition-all cursor-pointer shadow-sm"
+                    className="px-5 py-2.5 bg-card border border-foreground/10 text-foreground font-semibold rounded-[12px] hover:bg-accent hover:border-foreground/20 transition-all cursor-pointer shadow-sm"
                   >
                     Cancel
                   </button>

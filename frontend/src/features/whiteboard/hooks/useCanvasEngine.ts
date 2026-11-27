@@ -92,7 +92,9 @@ export function useCanvasEngine() {
   const selectedShape = shapes.find(s => s.id === selectedId) || null;
 
   const pushHistory = useCallback((newShapes: Shape[]) => {
-    const snap = JSON.parse(JSON.stringify(newShapes));
+    const serialized = JSON.stringify(newShapes);
+    if (serialized === JSON.stringify(historyRef.current[historyIndexRef.current])) return;
+    const snap = JSON.parse(serialized);
     const trimmed = historyRef.current.slice(0, historyIndexRef.current + 1);
     trimmed.push(snap);
     if (trimmed.length > MAX_HISTORY) trimmed.shift();
@@ -100,11 +102,32 @@ export function useCanvasEngine() {
     historyIndexRef.current = trimmed.length - 1;
   }, []);
 
+  // A loaded board is the starting point of history, so undo can't erase it
+  const loadShapes = useCallback((loaded: Shape[]) => {
+    historyRef.current = [JSON.parse(JSON.stringify(loaded))];
+    historyIndexRef.current = 0;
+    setShapes(loaded);
+    setSelectedIds([]);
+  }, []);
+
+  const replaceShapes = useCallback((next: Shape[]) => {
+    pushHistory(next);
+    setShapes(next);
+    setSelectedIds([]);
+  }, [pushHistory]);
+
+  // Shapes on hidden layers can't be clicked
+  const hitTestVisible = useCallback((x: number, y: number) => {
+    const hidden = new Set(layersRef.current.filter(l => !l.visible).map(l => l.id));
+    return hitTestShape(x, y, shapesRef.current.filter(s => !hidden.has(s.layerId || 'default')));
+  }, []);
+
   const undo = useCallback(() => {
     if (historyIndexRef.current <= 0) return;
     historyIndexRef.current--;
     const snap = historyRef.current[historyIndexRef.current];
     setShapes(JSON.parse(JSON.stringify(snap)));
+    setSelectedIds([]);
   }, []);
 
   const redo = useCallback(() => {
@@ -112,6 +135,7 @@ export function useCanvasEngine() {
     historyIndexRef.current++;
     const snap = historyRef.current[historyIndexRef.current];
     setShapes(JSON.parse(JSON.stringify(snap)));
+    setSelectedIds([]);
   }, []);
 
   const addShapes = useCallback((newShapes: Shape[]) => {
@@ -123,10 +147,9 @@ export function useCanvasEngine() {
   }, [pushHistory]);
 
   const clearCanvas = useCallback(() => {
-    setShapes([]);
-    pushHistory([]);
-    setSelectedIds([]);
-  }, [pushHistory]);
+    const locked = new Set(layersRef.current.filter(l => l.locked).map(l => l.id));
+    replaceShapes(shapesRef.current.filter(s => locked.has(s.layerId || 'default')));
+  }, [replaceShapes]);
 
   const deleteSelected = useCallback(() => {
     if (selectedIds.length === 0) return;
@@ -257,6 +280,9 @@ export function useCanvasEngine() {
     setEditingId(null);
     setEditingText('');
   }, [editingId, editingText, pushHistory]);
+
+  const finishTextRef = useRef(finishTextEditing);
+  finishTextRef.current = finishTextEditing;
 
   // Image insertion base64
   const insertImage = useCallback((base64Data: string) => {
@@ -423,6 +449,8 @@ export function useCanvasEngine() {
   const onMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    // Commit any open inline editor before acting on this click
+    finishTextRef.current(true);
     const v = viewportRef.current;
     const native = e.nativeEvent;
     const wp = screenToWorld(native.offsetX, native.offsetY, v);
@@ -440,7 +468,7 @@ export function useCanvasEngine() {
     }
 
     if (tool === 'select') {
-      const hit = hitTestShape(wp.x, wp.y, shapesRef.current);
+      const hit = hitTestVisible(wp.x, wp.y);
       if (hit) {
         // If the shape's layer is locked, do not allow interactions
         const layer = layersRef.current.find(l => l.id === (hit.layerId || 'default'));
@@ -506,7 +534,7 @@ export function useCanvasEngine() {
     }
 
     if (tool === 'arrow') {
-      const hit = hitTestShape(wp.x, wp.y, shapesRef.current);
+      const hit = hitTestVisible(wp.x, wp.y);
       if (hit && hit.type !== 'arrow' && hit.type !== 'line') {
         const temp = createShape('arrow', {
           startShapeId: hit.id, stroke: strokeColor, strokeWidth,
@@ -518,6 +546,7 @@ export function useCanvasEngine() {
     }
 
     if (tool === 'text') {
+      e.preventDefault();
       const shape = createShape('text', {
         x: wp.x - 100, y: wp.y - 20, text: 'Text',
         fill: strokeColor, stroke: 'transparent', fontSize,
@@ -533,6 +562,7 @@ export function useCanvasEngine() {
     }
 
     if (tool === 'sticky') {
+      e.preventDefault();
       const shape = createShape('sticky', {
         x: wp.x - 80, y: wp.y - 80, text: 'Note',
         layerId: activeLayerId
@@ -581,6 +611,8 @@ export function useCanvasEngine() {
   const onMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    // Commit any open inline editor before acting on this click
+    finishTextRef.current(true);
     const v = viewportRef.current;
     const native = e.nativeEvent;
     const wp = screenToWorld(native.offsetX, native.offsetY, v);
@@ -639,7 +671,7 @@ export function useCanvasEngine() {
         updated.width = Math.abs(wp.x - ds.startX);
         updated.height = Math.abs(wp.y - ds.startY);
       } else {
-        const hit = hitTestShape(wp.x, wp.y, shapesRef.current);
+        const hit = hitTestVisible(wp.x, wp.y);
         updated.endShapeId = hit && hit.id !== updated.startShapeId ? hit.id : null;
       }
       ds.tempShape = updated;
@@ -736,7 +768,7 @@ export function useCanvasEngine() {
     const v = viewportRef.current;
     const native = e.nativeEvent;
     const wp = screenToWorld(native.offsetX, native.offsetY, v);
-    const hit = hitTestShape(wp.x, wp.y, shapesRef.current);
+    const hit = hitTestVisible(wp.x, wp.y);
     if (hit && hit.type !== 'pen' && hit.type !== 'image') {
       // Check if shape's layer is locked
       const layer = layersRef.current.find(l => l.id === (hit.layerId || 'default'));
@@ -756,7 +788,7 @@ export function useCanvasEngine() {
   }, []);
 
   return {
-    shapes, setShapes, viewport, setViewport, selectedShape, selectedId, selectedIds, setSelectedIds,
+    shapes, setShapes, loadShapes, replaceShapes, viewport, setViewport, selectedShape, selectedId, selectedIds, setSelectedIds,
     tool, setTool: setToolAndCursor, fillColor, setFillColor,
     strokeColor, setStrokeColor, strokeWidth, setStrokeWidth,
     fontSize, setFontSize, cursorPos, zoomPercent,

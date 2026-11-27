@@ -83,7 +83,8 @@ router.post("/", async (req, res) => {
       question: q.question,
       options: q.options,
       correct_index: q.correctIndex,
-      explanation: q.explanation
+      explanation: q.explanation,
+      citation: q.citation || null
     }));
 
     const { data: savedQuestions, error: qError } = await supabase

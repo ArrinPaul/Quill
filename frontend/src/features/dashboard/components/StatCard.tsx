@@ -16,7 +16,7 @@ export function StatCard({ icon: Icon, label, value, color = "bg-primary/10 text
     <motion.div 
       whileHover={{ y: -4, scale: 1.02 }}
       transition={{ type: "spring", stiffness: 300, damping: 20 }}
-      className="bg-white border border-border rounded-[10px] p-5 card-hover shadow-sm hover:shadow-md"
+      className="bg-card border border-border rounded-[10px] p-5 card-hover shadow-sm hover:shadow-md"
     >
       <div className="flex items-center gap-4">
         <div className={cn("w-11 h-11 rounded-[10px] flex items-center justify-center", color)}>

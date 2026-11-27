@@ -28,7 +28,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="bg-white rounded-[10px] border border-border p-8 shadow-sm">
+    <div className="bg-card rounded-[10px] border border-border p-8 shadow-sm">
       <div className="mb-6">
         <h1 className="text-xl font-bold text-foreground" style={{ letterSpacing: "-0.02em" }}>Login to continue</h1>
         <p className="text-sm text-muted-foreground mt-1">Sign in with your email and password</p>

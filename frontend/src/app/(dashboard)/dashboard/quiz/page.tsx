@@ -1,4 +1,6 @@
 "use client";
+import { activateOnKey } from "@/lib/a11y";
+import { useEscape } from "@/hooks/useEscape";
 import { toast } from 'sonner';
 
 import { useState, useEffect } from "react";
@@ -37,6 +39,7 @@ export default function QuizPage() {
 
   // Modal state for New Quiz
   const [isNewQuizModalOpen, setIsNewQuizModalOpen] = useState(false);
+  useEscape(isNewQuizModalOpen, () => setIsNewQuizModalOpen(false));
   const [newQuizTitle, setNewQuizTitle] = useState("");
   const [newQuizContent, setNewQuizContent] = useState("");
   const [newQuizCount, setNewQuizCount] = useState(5);
@@ -136,7 +139,7 @@ export default function QuizPage() {
     try {
       let extractedText = "";
 
-      if (file.name.endsWith(".pdf")) {
+      if (file.name.toLowerCase().endsWith(".pdf")) {
         const pdfjsLib = await loadPdfJs();
         if (!pdfjsLib) throw new Error("Could not initialize PDF reader module.");
 
@@ -363,8 +366,9 @@ export default function QuizPage() {
                     <div 
                       key={q.id}
                       onClick={() => setSelectedQuizId(q.id)}
+                      role="button" tabIndex={0} onKeyDown={activateOnKey}
                       className={`group border rounded-[10px] p-3 transition-standard cursor-pointer flex items-start gap-2.5 relative ${
-                        isSelected ? "bg-white border-primary/40 shadow-sm" : "bg-transparent border-border hover:bg-muted/45"
+                        isSelected ? "bg-card border-primary/40 shadow-sm" : "bg-transparent border-border hover:bg-muted/45"
                       }`}
                     >
                       <div className="flex-1 min-w-0">
@@ -381,6 +385,7 @@ export default function QuizPage() {
 
                       <div className="absolute right-2 top-2 flex items-center gap-1 lg:opacity-0 lg:group-hover:opacity-100 transition-standard" onClick={(e) => e.stopPropagation()}>
                         <button
+                          aria-label={`Delete quiz ${q.title}`}
                           onClick={(e) => handleDeleteQuiz(q.id, e)}
                           className="p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-[10px] transition-standard cursor-pointer"
                         >
@@ -399,7 +404,7 @@ export default function QuizPage() {
         <div className="lg:col-span-8 space-y-6">
           {/* Empty State */}
           {!selectedQuizId && !loading && (
-            <div className="bg-white border border-border rounded-[10px] p-12 text-center shadow-sm">
+            <div className="bg-card border border-border rounded-[10px] p-12 text-center shadow-sm">
               <HelpCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-foreground mb-2">Assessment Center</h3>
               <p className="text-sm text-muted-foreground mb-4">
@@ -426,7 +431,7 @@ export default function QuizPage() {
 
           {/* Loading */}
           {loading && (
-            <div className="h-[460px] border border-border rounded-[10px] bg-white flex flex-col items-center justify-center text-center p-8 shadow-sm">
+            <div className="h-[460px] border border-border rounded-[10px] bg-card flex flex-col items-center justify-center text-center p-8 shadow-sm">
               <Loader2 className="w-10 h-10 text-primary animate-spin mb-4" />
               <h3 className="text-lg font-bold text-foreground font-sans">
                 {selectedQuizId && !questions.length ? "Loading Quiz..." : "Drafting Questions..."}
@@ -485,7 +490,7 @@ export default function QuizPage() {
                 /* INTERACTIVE VIEW */
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
                   
-                  <div className="md:col-span-8 bg-white border border-border rounded-[10px] p-6 shadow-sm space-y-6">
+                  <div className="md:col-span-8 bg-card border border-border rounded-[10px] p-6 shadow-sm space-y-6">
                     
                     <div className="space-y-2">
                       <div className="flex items-center justify-between flex-shrink-0 mb-6">
@@ -519,7 +524,7 @@ export default function QuizPage() {
                         
                         if (submitted) {
                           if (isCorrect) {
-                            cardStyle = "flex items-center gap-3.5 p-4 border border-purple-200 bg-[#f3edfa] text-purple-800 rounded-[10px] text-sm font-medium";
+                            cardStyle = "flex items-center gap-3.5 p-4 border border-purple-200 bg-[#f3edfa] dark:bg-muted text-purple-800 rounded-[10px] text-sm font-medium";
                             letterBadgeStyle = "w-7 h-7 rounded-full bg-purple-600 text-primary-foreground font-bold text-xs flex items-center justify-center flex-shrink-0";
                           } else if (isSelected) {
                             cardStyle = "flex items-center gap-3.5 p-4 border border-destructive/20 bg-destructive/10 text-red-800 rounded-[10px] text-sm font-medium";
@@ -528,7 +533,7 @@ export default function QuizPage() {
                             cardStyle = "flex items-center gap-3.5 p-4 border border-border rounded-[10px] text-sm opacity-55 pointer-events-none";
                           }
                         } else if (isSelected) {
-                          cardStyle = "flex items-center gap-3.5 p-4 border border-[#5b21b6] bg-[#f3eefa] text-foreground rounded-[10px] text-sm font-semibold shadow-sm";
+                          cardStyle = "flex items-center gap-3.5 p-4 border border-[#5b21b6] bg-[#f3eefa] dark:bg-muted text-foreground rounded-[10px] text-sm font-semibold shadow-sm";
                           letterBadgeStyle = "w-7 h-7 rounded-full bg-primary text-primary-foreground font-bold text-xs flex items-center justify-center flex-shrink-0";
                         }
 
@@ -547,16 +552,16 @@ export default function QuizPage() {
                     </div>
 
                     {submitted && (
-                      <div className="space-y-3.5 border-t border-[#f3eff8] pt-4">
+                      <div className="space-y-3.5 border-t border-[#f3eff8] dark:border-border pt-4">
                         {questions[activeQuestionIndex].explanation && (
-                          <div className="bg-[#f5f0fa] border border-border rounded-[10px] p-4 text-xs text-muted-foreground font-sans leading-relaxed">
+                          <div className="bg-[#f5f0fa] dark:bg-muted border border-border rounded-[10px] p-4 text-xs text-muted-foreground font-sans leading-relaxed">
                             <strong className="text-primary font-sans block mb-1 uppercase tracking-wider text-xs">Explanation Key:</strong>
                             {questions[activeQuestionIndex].explanation}
                           </div>
                         )}
 
                         {questions[activeQuestionIndex].citation && (
-                          <div className="bg-[#f0e8fa] border-l-2 border-[#5b21b6] p-3 text-xs text-muted-foreground font-sans italic rounded-r-[4px]">
+                          <div className="bg-[#f0e8fa] dark:bg-muted border-l-2 border-[#5b21b6] p-3 text-xs text-muted-foreground font-sans italic rounded-r-[4px]">
                             <strong className="text-xs font-bold text-primary font-sans block not-italic uppercase mb-0.5">Reference Source Quote:</strong>
                             "{questions[activeQuestionIndex].citation}"
                           </div>
@@ -564,7 +569,7 @@ export default function QuizPage() {
                       </div>
                     )}
 
-                    <div className="flex items-center justify-between border-t border-[#f3eff8] pt-4 mt-2">
+                    <div className="flex items-center justify-between border-t border-[#f3eff8] dark:border-border pt-4 mt-2">
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => setActiveQuestionIndex((prev) => Math.max(0, prev - 1))}
@@ -609,13 +614,13 @@ export default function QuizPage() {
                         let dotStyle = "h-9 w-9 rounded-full flex items-center justify-center text-xs font-bold font-sans cursor-pointer transition-standard border ";
                         
                         if (submitted) {
-                          dotStyle += correct ? "bg-[#f3edfa] border-purple-500 text-purple-700" : "bg-destructive/10 border-red-500 text-red-700";
+                          dotStyle += correct ? "bg-[#f3edfa] dark:bg-muted border-purple-500 text-purple-700" : "bg-destructive/10 border-red-500 text-red-700";
                         } else if (isCurrent) {
                           dotStyle += "bg-primary border-[#5b21b6] text-primary-foreground shadow-sm";
                         } else if (isAnswered) {
-                          dotStyle += "bg-[#e5ece9] border-[#5b21b6]/30 text-foreground";
+                          dotStyle += "bg-[#e5ece9] dark:bg-muted border-[#5b21b6]/30 text-foreground";
                         } else {
-                          dotStyle += "bg-white border-border text-muted-foreground";
+                          dotStyle += "bg-card border-border text-muted-foreground";
                         }
 
                         return (
@@ -627,7 +632,7 @@ export default function QuizPage() {
                     </div>
 
                     {!submitted && unansweredCount > 0 && (
-                      <div className="p-3 bg-[#f0e6ff] border border-[#d4c0f0] text-foreground rounded-[10px] text-xs font-sans leading-normal">
+                      <div className="p-3 bg-[#f0e6ff] dark:bg-muted border border-[#d4c0f0] dark:border-border text-foreground rounded-[10px] text-xs font-sans leading-normal">
                         ⚠️ <strong>{unansweredCount} item{unansweredCount > 1 ? "s" : ""} left.</strong> Complete all responses.
                       </div>
                     )}
@@ -643,9 +648,9 @@ export default function QuizPage() {
               ) : (
                 /* REPORT SHEET */
                 <div className="space-y-6">
-                  <div className="bg-white border border-border rounded-[10px] p-8 shadow-sm text-center space-y-6">
+                  <div className="bg-card border border-border rounded-[10px] p-8 shadow-sm text-center space-y-6">
                     <div className="max-w-md mx-auto space-y-2">
-                      <div className="w-14 h-14 rounded-full bg-[#f3edfa] border border-[#d2c0f0] text-primary flex items-center justify-center mx-auto mb-2">
+                      <div className="w-14 h-14 rounded-full bg-[#f3edfa] dark:bg-muted border border-[#d2c0f0] dark:border-border text-primary flex items-center justify-center mx-auto mb-2">
                         <Award className="w-7 h-7" />
                       </div>
                       <h2 className="text-2xl font-bold text-foreground font-sans">Assessment Summary</h2>
@@ -667,7 +672,7 @@ export default function QuizPage() {
                       </div>
                     </div>
 
-                    <div className="flex flex-wrap justify-center gap-3 pt-4 border-t border-[#f3eff8] max-w-md mx-auto">
+                    <div className="flex flex-wrap justify-center gap-3 pt-4 border-t border-[#f3eff8] dark:border-border max-w-md mx-auto">
                       <button onClick={handleRetake} className="px-4 py-2 border border-[#5b21b6] hover:bg-[#f1ecf8] text-primary font-semibold rounded-[10px] text-xs transition-standard flex items-center gap-1.5">
                         <RefreshCw className="w-3.5 h-3.5" /> Retake Quiz
                       </button>
@@ -677,7 +682,7 @@ export default function QuizPage() {
                     </div>
                   </div>
 
-                  <div className="bg-white border border-border rounded-[10px] overflow-hidden divide-y divide-[#e0d4f0] shadow-sm">
+                  <div className="bg-card border border-border rounded-[10px] overflow-hidden divide-y divide-[#e0d4f0] shadow-sm">
                     {questions.map((q, qidx) => {
                       const passed = answers[qidx] === q.correct_index;
                       return (
@@ -713,13 +718,13 @@ export default function QuizPage() {
 
                           <div className="space-y-2.5">
                             {q.explanation && (
-                              <div className="bg-[#f5f0fa] border border-border rounded-[10px] p-4 text-xs text-muted-foreground font-sans leading-relaxed">
+                              <div className="bg-[#f5f0fa] dark:bg-muted border border-border rounded-[10px] p-4 text-xs text-muted-foreground font-sans leading-relaxed">
                                 <strong className="text-primary font-sans block mb-1 uppercase tracking-wider text-xs">Concept Explanation:</strong>
                                 {q.explanation}
                               </div>
                             )}
                             {q.citation && (
-                              <div className="bg-[#f0e8fa] border-l-2 border-[#5b21b6] p-3.5 text-xs text-muted-foreground font-sans italic rounded-r-[4px]">
+                              <div className="bg-[#f0e8fa] dark:bg-muted border-l-2 border-[#5b21b6] p-3.5 text-xs text-muted-foreground font-sans italic rounded-r-[4px]">
                                 <strong className="text-xs font-bold text-primary font-sans block not-italic uppercase mb-0.5">Supporting Citation:</strong>
                                 "{q.citation}"
                               </div>
@@ -738,8 +743,8 @@ export default function QuizPage() {
 
       {/* New Quiz Modal */}
       {isNewQuizModalOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
-          <div className="bg-white rounded-[12px] border border-border shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 flex flex-col space-y-4">
+        <div role="dialog" aria-modal="true" className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-card rounded-[12px] border border-border shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 flex flex-col space-y-4">
             <div className="flex items-center justify-between border-b border-border pb-4 mb-4">
               <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-primary" />
@@ -787,7 +792,7 @@ export default function QuizPage() {
                     type="text"
                     value={newQuizTitle}
                     onChange={(e) => setNewQuizTitle(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-border rounded-[10px] text-xs focus:outline-none focus:ring-2 focus:ring-ring text-foreground"
+                    className="w-full px-3 py-2 bg-card border border-border rounded-[10px] text-xs focus:outline-none focus:ring-2 focus:ring-ring text-foreground"
                     placeholder="e.g. Photosynthesis Chapter 4"
                   />
                 </div>
@@ -798,7 +803,7 @@ export default function QuizPage() {
                     <select
                       value={newQuizType}
                       onChange={(e) => setNewQuizType(e.target.value as any)}
-                      className="w-full px-3 py-2 bg-white border border-border rounded-[10px] text-xs focus:outline-none focus:ring-2 focus:ring-ring text-foreground"
+                      className="w-full px-3 py-2 bg-card border border-border rounded-[10px] text-xs focus:outline-none focus:ring-2 focus:ring-ring text-foreground"
                     >
                       <option value="mcq">MCQ (4 choices)</option>
                       <option value="tf">True / False</option>
@@ -809,7 +814,7 @@ export default function QuizPage() {
                     <select
                       value={newQuizCount}
                       onChange={(e) => setNewQuizCount(Number(e.target.value))}
-                      className="w-full px-3 py-2 bg-white border border-border rounded-[10px] text-xs focus:outline-none focus:ring-2 focus:ring-ring text-foreground"
+                      className="w-full px-3 py-2 bg-card border border-border rounded-[10px] text-xs focus:outline-none focus:ring-2 focus:ring-ring text-foreground"
                     >
                       <option value={3}>3 Items</option>
                       <option value={5}>5 Items</option>
@@ -824,7 +829,7 @@ export default function QuizPage() {
                   <textarea
                     value={newQuizContent}
                     onChange={(e) => setNewQuizContent(e.target.value)}
-                    className="w-full h-44 px-3 py-2 bg-white border border-border rounded-[10px] text-xs focus:outline-none focus:ring-2 focus:ring-ring resize-none text-foreground font-sans leading-relaxed"
+                    className="w-full h-44 px-3 py-2 bg-card border border-border rounded-[10px] text-xs focus:outline-none focus:ring-2 focus:ring-ring resize-none text-foreground font-sans leading-relaxed"
                     placeholder="Paste details or notes to generate quiz from..."
                   />
                 </div>
@@ -832,7 +837,7 @@ export default function QuizPage() {
             )}
 
             {modalTab === "upload" && (
-              <div className="py-6 flex flex-col items-center justify-center border-2 border-dashed border-border rounded-[10px] bg-white transition-standard hover:bg-background/50 text-center p-6 relative">
+              <div className="py-6 flex flex-col items-center justify-center border-2 border-dashed border-border rounded-[10px] bg-card transition-standard hover:bg-background/50 text-center p-6 relative">
                 {fileLoading ? (
                   <div className="flex flex-col items-center gap-3">
                     <Loader2 className="w-8 h-8 text-primary animate-spin" />

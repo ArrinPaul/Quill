@@ -69,7 +69,7 @@ export function AchievementWidget({ isExpanded }: AchievementWidgetProps) {
 
   if (loading) {
     return (
-      <div className="bg-white border border-border rounded-[10px] p-5 card-hover h-full flex flex-col items-center justify-center min-h-[250px]">
+      <div className="bg-card border border-border rounded-[10px] p-5 card-hover h-full flex flex-col items-center justify-center min-h-[250px]">
         <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin"></div>
       </div>
     );
@@ -77,7 +77,7 @@ export function AchievementWidget({ isExpanded }: AchievementWidgetProps) {
 
   if (!data) {
     return (
-      <div className="bg-white border border-border rounded-[10px] p-5 card-hover h-full flex flex-col items-center justify-center min-h-[250px]">
+      <div className="bg-card border border-border rounded-[10px] p-5 card-hover h-full flex flex-col items-center justify-center min-h-[250px]">
         <p className="text-sm text-muted-foreground">Failed to load achievements.</p>
       </div>
     );
@@ -99,7 +99,7 @@ export function AchievementWidget({ isExpanded }: AchievementWidgetProps) {
 
   if (isExpanded) {
     return (
-      <div className="p-6 md:p-8 flex flex-col h-full bg-white rounded-xl">
+      <div className="p-6 md:p-8 flex flex-col h-full bg-card rounded-xl">
         <div className="flex items-center gap-3 mb-8">
           <div className="w-12 h-12 rounded-[12px] bg-primary/10 flex items-center justify-center">
             <Trophy className="w-6 h-6 text-primary" />
@@ -175,7 +175,7 @@ export function AchievementWidget({ isExpanded }: AchievementWidgetProps) {
   }
 
   return (
-    <div className="bg-white border border-border rounded-[10px] p-5 card-hover h-full flex flex-col transition-all hover:shadow-md">
+    <div className="bg-card border border-border rounded-[10px] p-5 card-hover h-full flex flex-col transition-all hover:shadow-md">
       <div className="flex items-center gap-2 mb-4">
         <div className="w-8 h-8 rounded-[10px] bg-primary/10 flex items-center justify-center shrink-0">
           <Trophy className="w-4 h-4 text-primary" />

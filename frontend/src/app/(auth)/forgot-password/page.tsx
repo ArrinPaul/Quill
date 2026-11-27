@@ -22,6 +22,7 @@ function ForgotPasswordContent() {
   useEffect(() => {
     setError("");
     setSuccessMsg("");
+    setDevResetUrl("");
   }, [token]);
 
   const handleRequestReset = async (e: React.FormEvent) => {
@@ -75,7 +76,7 @@ function ForgotPasswordContent() {
   };
 
   return (
-    <div className="bg-white rounded-[10px] border border-border p-8 shadow-sm">
+    <div className="bg-card rounded-[10px] border border-border p-8 shadow-sm">
       <div className="mb-6">
         <Link
           href="/login"
@@ -210,7 +211,7 @@ export default function ForgotPasswordPage() {
   return (
     <Suspense
       fallback={
-        <div className="bg-white rounded-[10px] border border-border p-8 shadow-sm text-center text-sm text-muted-foreground">
+        <div className="bg-card rounded-[10px] border border-border p-8 shadow-sm text-center text-sm text-muted-foreground">
           Loading...
         </div>
       }

@@ -29,6 +29,15 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ message: "Subject, total classes, and attended classes are required" });
     }
 
+    const target = threshold === undefined || threshold === null || threshold === "" ? 75 : Number(threshold);
+    const isCount = (n) => Number.isInteger(n) && n >= 0;
+    if (!isCount(total_classes) || !isCount(attended_classes) || attended_classes > total_classes) {
+      return res.status(400).json({ message: "Class counts must be whole numbers, with attended no greater than total" });
+    }
+    if (!Number.isFinite(target) || target < 0 || target > 100) {
+      return res.status(400).json({ message: "Threshold must be between 0 and 100" });
+    }
+
     const { data: existing } = await getClient()
       .from("attendance")
       .select("id")
@@ -41,7 +50,7 @@ router.post("/", async (req, res) => {
     if (existing) {
       const { data, error } = await getClient()
         .from("attendance")
-        .update({ total_classes, attended_classes, threshold: threshold || 75, updated_at: new Date().toISOString() })
+        .update({ total_classes, attended_classes, threshold: target, updated_at: new Date().toISOString() })
         .eq("id", existing.id)
         .select()
         .single();
@@ -56,7 +65,7 @@ router.post("/", async (req, res) => {
           subject,
           total_classes,
           attended_classes,
-          threshold: threshold || 75,
+          threshold: target,
         })
         .select()
         .single();

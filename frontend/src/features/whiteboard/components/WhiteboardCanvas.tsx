@@ -24,6 +24,9 @@ export function WhiteboardCanvas({ whiteboardId, title, onBack }: WhiteboardCanv
   const [layersOpen, setLayersOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
+  // Auto-save stays off until the board has loaded, so an empty canvas never overwrites it
+  const [loadedId, setLoadedId] = useState<string | null>(null);
+
   // Load saved whiteboard data on mount / change
   useEffect(() => {
     if (!whiteboardId) return;
@@ -31,10 +34,12 @@ export function WhiteboardCanvas({ whiteboardId, title, onBack }: WhiteboardCanv
       try {
         const res = await api.get<{ whiteboard: any }>(`/api/whiteboards/${whiteboardId}`);
         const boardData = res.whiteboard.data || {};
-        if (boardData.shapes) engine.setShapes(boardData.shapes);
+        if (boardData.shapes) engine.loadShapes(boardData.shapes);
         if (boardData.viewport) engine.setViewport(boardData.viewport);
         if (boardData.layers) engine.setLayers(boardData.layers);
+        setLoadedId(whiteboardId);
       } catch (err) {
+        engine.showToast('Could not load this whiteboard. Go back and try again.', 'error');
         console.error('Failed to load whiteboard:', err);
       }
     };
@@ -43,7 +48,7 @@ export function WhiteboardCanvas({ whiteboardId, title, onBack }: WhiteboardCanv
 
   // Debounced auto-save (3 seconds delay)
   const saveStatus = useAutoSave(
-    whiteboardId,
+    loadedId === whiteboardId ? whiteboardId : null,
     engine.shapes,
     engine.viewport,
     engine.layers,
@@ -81,7 +86,7 @@ export function WhiteboardCanvas({ whiteboardId, title, onBack }: WhiteboardCanv
       reader.onload = (ev) => {
         try {
           const data = JSON.parse(ev.target?.result as string);
-          if (data.shapes) engine.setShapes(data.shapes);
+          if (data.shapes) engine.replaceShapes(data.shapes);
           if (data.viewport) engine.setViewport(data.viewport);
           if (data.layers) engine.setLayers(data.layers);
         } catch {
@@ -91,10 +96,10 @@ export function WhiteboardCanvas({ whiteboardId, title, onBack }: WhiteboardCanv
       reader.readAsText(file);
     };
     input.click();
-  }, [engine.setShapes, engine.setViewport, engine.setLayers, engine.showToast]);
+  }, [engine.replaceShapes, engine.setViewport, engine.setLayers, engine.showToast]);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-120px)] border border-border rounded-[10px] overflow-hidden bg-white shadow-sm relative">
+    <div className="flex flex-col h-[calc(100vh-120px)] border border-border rounded-[10px] overflow-hidden bg-card shadow-sm relative">
       {/* Top Header bar with Back button, Title and Save status */}
       <div className="bg-muted/30 border-b border-border px-4 py-2 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -169,11 +174,12 @@ export function WhiteboardCanvas({ whiteboardId, title, onBack }: WhiteboardCanv
         <div className="flex-1 relative overflow-hidden">
           <canvas
             ref={engine.canvasRef}
-            className="absolute inset-0"
-            onMouseDown={engine.onMouseDown}
-            onMouseMove={engine.onMouseMove}
-            onMouseUp={engine.onMouseUp}
-            onMouseLeave={engine.onMouseUp}
+            className="absolute inset-0 touch-none"
+            onPointerDown={engine.onMouseDown}
+            onPointerMove={engine.onMouseMove}
+            onPointerUp={engine.onMouseUp}
+            onPointerLeave={engine.onMouseUp}
+            onPointerCancel={engine.onMouseUp}
             onWheel={engine.onWheel}
             onDoubleClick={engine.onDoubleClick}
             onContextMenu={e => e.preventDefault()}
@@ -181,7 +187,7 @@ export function WhiteboardCanvas({ whiteboardId, title, onBack }: WhiteboardCanv
 
           {/* Floating Selection Action Bar — appears when shape(s) are selected */}
           {engine.selectedIds.length > 0 && !engine.editingId && (
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 flex flex-wrap items-center justify-center gap-1 max-w-[95%] bg-white border border-border shadow-lg rounded-[10px] px-2 py-1.5 animate-in fade-in slide-in-from-top-2 duration-150">
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 flex flex-wrap items-center justify-center gap-1 max-w-[95%] bg-card border border-border shadow-lg rounded-[10px] px-2 py-1.5 animate-in fade-in slide-in-from-top-2 duration-150">
               <span className="text-xs font-semibold text-muted-foreground px-1 border-r border-border mr-1">
                 {engine.selectedIds.length} selected
               </span>
@@ -236,7 +242,7 @@ export function WhiteboardCanvas({ whiteboardId, title, onBack }: WhiteboardCanv
           </div>
 
           {/* Status info bar */}
-          <div className="absolute bottom-2 left-2 flex gap-3 text-xs text-muted-foreground bg-white/80 px-2 py-1 rounded border border-border/50 pointer-events-none font-medium">
+          <div className="absolute bottom-2 left-2 flex gap-3 text-xs text-muted-foreground bg-card/80 px-2 py-1 rounded border border-border/50 pointer-events-none font-medium">
             <span>{engine.tool.toUpperCase()}</span>
             <span>{engine.cursorPos.x}, {engine.cursorPos.y}</span>
             <span>{engine.zoomPercent}%</span>
@@ -250,7 +256,7 @@ export function WhiteboardCanvas({ whiteboardId, title, onBack }: WhiteboardCanv
             className={`absolute bottom-2 right-2 z-20 p-2 rounded-full border shadow-sm transition-all cursor-pointer ${
               layersOpen
                 ? 'bg-primary text-primary-foreground border-primary'
-                : 'bg-white text-muted-foreground border-border hover:text-foreground'
+                : 'bg-card text-muted-foreground border-border hover:text-foreground'
             }`}
             title="Toggle Layers"
           >
@@ -265,6 +271,10 @@ export function WhiteboardCanvas({ whiteboardId, title, onBack }: WhiteboardCanv
               const s = worldToScreenShape(editingShape, engine.viewport);
               return (
                 <textarea
+                  key={engine.editingId}
+                  aria-label="Shape text"
+                  // Focus after the click finishes, with the placeholder selected so typing replaces it
+                  ref={el => { if (el && !el.dataset.focused) { el.dataset.focused = '1'; requestAnimationFrame(() => { el.focus(); el.select(); }); } }}
                   value={engine.editingText}
                   onChange={e => engine.setEditingText(e.target.value)}
                   onKeyDown={e => {
@@ -276,7 +286,7 @@ export function WhiteboardCanvas({ whiteboardId, title, onBack }: WhiteboardCanv
                     }
                   }}
                   onBlur={() => engine.finishTextEditing(true)}
-                  className="absolute z-40 bg-white border-2 border-primary rounded p-1 text-center font-sans resize-none focus:outline-none focus:ring-1 focus:ring-primary shadow-lg"
+                  className="absolute z-40 bg-white text-black border-2 border-primary rounded p-1 text-center font-sans resize-none focus:outline-none focus:ring-1 focus:ring-primary shadow-lg"
                   style={{
                     left: `${s.x}px`,
                     top: `${s.y}px`,
@@ -320,7 +330,7 @@ export function WhiteboardCanvas({ whiteboardId, title, onBack }: WhiteboardCanv
 
       {/* Toast Notification */}
       {engine.toast && (
-        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-white border border-border shadow-lg rounded-[10px] px-4 py-3 animate-in fade-in slide-in-from-top-4 duration-300">
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-card border border-border shadow-lg rounded-[10px] px-4 py-3 animate-in fade-in slide-in-from-top-4 duration-300">
           {engine.toast.type === 'error' ? (
             <AlertCircle className="w-4 h-4 text-destructive flex-shrink-0" />
           ) : engine.toast.type === 'success' ? (

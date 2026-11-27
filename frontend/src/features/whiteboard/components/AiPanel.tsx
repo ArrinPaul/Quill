@@ -128,7 +128,7 @@ export const AiPanel = memo(function AiPanel({ isOpen, onToggle, shapes, onAddSh
   }
 
   return (
-    <div className="w-72 sm:w-[340px] border-l border-border bg-white flex flex-col h-full">
+    <div className="w-72 sm:w-[340px] border-l border-border bg-card flex flex-col h-full">
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <h3 className="font-semibold text-sm flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-primary" />

@@ -1,5 +1,6 @@
 'use client';
 
+import { useEscape } from "@/hooks/useEscape";
 import { XClose as X } from "@untitledui/icons";
 
 interface ShortcutsPanelProps {
@@ -8,6 +9,7 @@ interface ShortcutsPanelProps {
 }
 
 export function ShortcutsPanel({ isOpen, onClose }: ShortcutsPanelProps) {
+  useEscape(isOpen, () => onClose());
   if (!isOpen) return null;
 
   const groups = [
@@ -47,8 +49,8 @@ export function ShortcutsPanel({ isOpen, onClose }: ShortcutsPanelProps) {
   ];
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-[10px] shadow-xl max-w-md w-full border border-border flex flex-col max-h-[90vh]">
+    <div role="dialog" aria-modal="true" className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+      <div className="bg-card rounded-[10px] shadow-xl max-w-md w-full border border-border flex flex-col max-h-[90vh]">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <h3 className="font-semibold text-sm">Keyboard Shortcuts</h3>
           <button onClick={onClose} className="p-1 hover:bg-muted rounded-[6px] cursor-pointer">

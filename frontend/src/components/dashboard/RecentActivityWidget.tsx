@@ -49,7 +49,7 @@ export function RecentActivityWidget() {
 
   if (loading) {
     return (
-      <div className="bg-white border border-border rounded-[10px] p-5 h-full">
+      <div className="bg-card border border-border rounded-[10px] p-5 h-full">
         <div className="h-4 bg-muted rounded animate-pulse w-1/3 mb-4" />
         {[1, 2, 3, 4].map((i) => (
           <div key={i} className="h-12 bg-muted rounded animate-pulse mb-2" />
@@ -60,7 +60,7 @@ export function RecentActivityWidget() {
 
   if (logs.length === 0) {
     return (
-      <div className="bg-white border border-border rounded-[10px] p-5 card-hover h-full">
+      <div className="bg-card border border-border rounded-[10px] p-5 card-hover h-full">
         <h3 className="font-semibold text-foreground text-sm mb-4">Recent Activity</h3>
         <div className="flex flex-col items-center justify-center py-8">
           <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mb-3">
@@ -74,7 +74,7 @@ export function RecentActivityWidget() {
   }
 
   return (
-    <div className="bg-white border border-border rounded-[10px] p-5 card-hover h-full">
+    <div className="bg-card border border-border rounded-[10px] p-5 card-hover h-full">
       <h3 className="font-semibold text-foreground text-sm mb-4">Recent Activity</h3>
       <div className="space-y-0">
         {logs.slice(0, 5).map((log) => {

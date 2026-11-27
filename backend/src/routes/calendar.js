@@ -1,111 +1,29 @@
+const crypto = require("crypto");
 const express = require("express");
+const authMiddleware = require("../middleware/auth");
 const { getClient } = require("../services/supabase");
-const { getValidAccessToken, createCalendarEvent } = require("../services/google");
 
 const router = express.Router();
 
-// POST /api/calendar/fan-out — called by n8n ingestion workflow after event is saved
-// Creates Google Calendar events for all group members who have calendar connected
-router.post("/fan-out", async (req, res) => {
-  try {
-    const { event_id } = req.body;
-
-    if (!event_id) {
-      return res.status(400).json({ message: "event_id is required" });
-    }
-
-    const supabase = getClient();
-
-    // Fetch the event
-    const { data: event, error: eventError } = await supabase
-      .from("events")
-      .select("*")
-      .eq("id", event_id)
-      .single();
-
-    if (eventError || !event) {
-      return res.status(404).json({ message: "Event not found" });
-    }
-
-    // Find all students in this group
-    const { data: members, error: membersError } = await supabase
-      .from("group_members")
-      .select("student_id")
-      .eq("group_id", event.group_id);
-
-    if (membersError) throw membersError;
-
-    if (!members || members.length === 0) {
-      return res.json({
-        message: "No group members found",
-        synced: 0,
-        failed: 0,
-      });
-    }
-
-    let synced = 0;
-    let failed = 0;
-
-    // Create calendar event for each member with Google Calendar connected
-    for (const member of members) {
-      try {
-        const accessToken = await getValidAccessToken(member.student_id);
-        if (!accessToken) {
-          // Student doesn't have Google Calendar connected — skip
-          continue;
-        }
-
-        const eventDate = new Date(event.event_date);
-        await createCalendarEvent(accessToken, {
-          summary: `[${event.category || "Deadline"}] ${event.title}`,
-          description: `Priority: ${event.priority || "Medium"}\nCategory: ${event.category || "Other"}\n\nOriginal message: ${event.raw_message || "N/A"}\n\nSynced via Quill`,
-          start: {
-            date: event.event_date, // All-day event (event_date is DATE, not DATETIME)
-          },
-          end: {
-            date: new Date(eventDate.getTime() + 86400000).toISOString().split("T")[0],
-          },
-          reminders: {
-            useDefault: false,
-            overrides: [
-              { method: "popup", minutes: 1440 }, // 1 day before
-              { method: "popup", minutes: 60 },   // 1 hour before
-            ],
-          },
-        });
-
-        synced++;
-      } catch (calErr) {
-        console.error(`Calendar sync failed for student ${member.student_id}:`, calErr.message);
-        failed++;
-      }
-    }
-
-    // Log the fan-out result
-    await supabase.from("automation_logs").insert({
-      student_id: members[0].student_id, // Log under first member for visibility
-      workflow_type: "deadline_reminder",
-      status: failed === 0 ? "success" : "triggered",
-      details: {
-        event_id,
-        event_title: event.title,
-        total_members: members.length,
-        synced,
-        failed,
-      },
-    });
-
-    res.json({
-      message: "Calendar fan-out complete",
-      synced,
-      failed,
-      total_members: members.length,
-    });
-  } catch (error) {
-    console.error("Calendar fan-out error:", error.message);
-    res.status(500).json({ message: error.message });
-  }
+// The n8n workflow that called this has been removed; it had no authentication.
+router.post("/fan-out", (req, res) => {
+  res.status(410).json({ message: "Calendar fan-out via n8n has been removed." });
 });
+
+// Calendar apps can't send auth headers, so the feed URL carries a per-student signature.
+const feedToken = (studentId) =>
+  crypto.createHmac("sha256", process.env.JWT_SECRET).update(`calendar-feed:${studentId}`).digest("hex");
+
+router.get("/feed-url", authMiddleware, (req, res) => {
+  res.json({ path: `/api/calendar/feed/${req.student.id}?token=${feedToken(req.student.id)}` });
+});
+
+const escapeIcs = (value) =>
+  String(value ?? "")
+    .replace(/\\/g, "\\\\")
+    .replace(/;/g, "\\;")
+    .replace(/,/g, "\\,")
+    .replace(/\r\n|\r|\n/g, "\\n");
 
 function formatIcsDate(dateString) {
   if (!dateString) return null;
@@ -118,6 +36,11 @@ function formatIcsDate(dateString) {
 router.get("/feed/:student_id", async (req, res) => {
   try {
     const { student_id } = req.params;
+    const given = Buffer.from(String(req.query.token || ""));
+    const expected = Buffer.from(feedToken(student_id));
+    if (given.length !== expected.length || !crypto.timingSafeEqual(given, expected)) {
+      return res.status(401).send("Invalid calendar feed link");
+    }
     const supabase = getClient();
 
     // Fetch personal tasks
@@ -164,8 +87,8 @@ router.get("/feed/:student_id", async (req, res) => {
         `DTSTAMP:${formatIcsDate(new Date())}`,
         `DTSTART:${dtStart}`,
         `DTEND:${dtEnd}`,
-        `SUMMARY:[Task] ${t.title || "Untitled"}`,
-        `DESCRIPTION:${t.subject || ""}\\n${t.description || ""}`,
+        `SUMMARY:${escapeIcs(`[Task] ${t.title || "Untitled"}`)}`,
+        `DESCRIPTION:${escapeIcs(`${t.subject || ""}\n${t.description || ""}`)}`,
         "END:VEVENT"
       );
     });
@@ -185,8 +108,8 @@ router.get("/feed/:student_id", async (req, res) => {
         `DTSTAMP:${formatIcsDate(new Date())}`,
         `DTSTART;VALUE=DATE:${start}`,
         `DTEND;VALUE=DATE:${end}`,
-        `SUMMARY:[Notice] ${e.title || "Class Event"}`,
-        `DESCRIPTION:Priority: ${e.priority || "Medium"}\\nCategory: ${e.category || "Other"}\\n\\n${e.raw_message || ""}`,
+        `SUMMARY:${escapeIcs(`[Notice] ${e.title || "Class Event"}`)}`,
+        `DESCRIPTION:${escapeIcs(`Priority: ${e.priority || "Medium"}\nCategory: ${e.category || "Other"}\n\n${e.raw_message || ""}`)}`,
         "END:VEVENT"
       );
     });

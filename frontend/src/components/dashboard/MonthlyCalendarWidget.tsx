@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Calendar as CalendarDays, ChevronLeft, ChevronRight, Link01 as Link2 } from "@untitledui/icons";
+import { Calendar as CalendarDays, ChevronLeft, ChevronRight } from "@untitledui/icons";
 import { api } from "@/lib/api";
-import { useAuth } from "@/hooks/useAuth";
 import type { Task } from "@/features/types";
 
 const MONTH_NAMES = [
@@ -12,27 +11,17 @@ const MONTH_NAMES = [
 ];
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-interface GoogleCalendarEvent {
-  id: string;
-  summary: string;
-  start: { dateTime?: string; date?: string };
-  end: { dateTime?: string; date?: string };
-}
-
 interface CalendarItem {
   id: string;
   title: string;
   date: Date;
-  type: "task" | "google";
+  type: "task";
   status?: string;
   subject?: string;
 }
 
 export function MonthlyCalendarWidget() {
-  const { user } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [googleEvents, setGoogleEvents] = useState<GoogleCalendarEvent[]>([]);
-  const [calendarConnected, setCalendarConnected] = useState(false);
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
@@ -46,19 +35,6 @@ export function MonthlyCalendarWidget() {
           .catch(() => ({ tasks: [] }));
         setTasks(taskRes.tasks || []);
 
-        // Check Google Calendar status
-        const statusRes = await api
-          .get<{ connected: boolean }>("/api/auth/google/status")
-          .catch(() => ({ connected: false }));
-        setCalendarConnected(statusRes.connected);
-
-        // Load Google Calendar events if connected
-        if (statusRes.connected) {
-          const gcalRes = await api
-            .get<{ events: { items: GoogleCalendarEvent[] } }>("/api/auth/google/calendar/events")
-            .catch(() => ({ events: { items: [] } }));
-          setGoogleEvents(gcalRes.events?.items || []);
-        }
       } finally {
         setLoading(false);
       }
@@ -107,26 +83,7 @@ export function MonthlyCalendarWidget() {
         subject: t.subject,
       }));
 
-    // Google Calendar events
-    const googleItems: CalendarItem[] = googleEvents
-      .filter((e) => {
-        const startStr = e.start?.dateTime || e.start?.date || "";
-        const d = new Date(startStr);
-        // For all-day events (date only), compare date strings
-        if (e.start?.date && !e.start?.dateTime) {
-          const eventDate = new Date(e.start.date + "T00:00:00");
-          return eventDate >= dayDate && eventDate < nextDay;
-        }
-        return d >= dayDate && d < nextDay;
-      })
-      .map((e) => ({
-        id: e.id,
-        title: e.summary || "Untitled",
-        date: new Date(e.start?.dateTime || e.start?.date || ""),
-        type: "google" as const,
-      }));
-
-    return [...taskItems, ...googleItems];
+    return taskItems;
   };
 
   const getSelectedDayItems = (): CalendarItem[] => {
@@ -140,19 +97,9 @@ export function MonthlyCalendarWidget() {
 
   const selectedItems = getSelectedDayItems();
 
-  const handleConnectCalendar = async () => {
-    if (!user) return;
-    try {
-      const res = await api.get<{ url: string }>(`/api/auth/google/url?state=${user.id}`);
-      window.location.href = res.url;
-    } catch {
-      // silently fail
-    }
-  };
-
   if (loading) {
     return (
-      <div className="bg-white border border-border rounded-[10px] p-5 h-full">
+      <div className="bg-card border border-border rounded-[10px] p-5 h-full">
         <div className="h-4 bg-muted rounded animate-pulse w-1/3 mb-4" />
         <div className="h-64 bg-muted rounded animate-pulse" />
       </div>
@@ -160,19 +107,13 @@ export function MonthlyCalendarWidget() {
   }
 
   return (
-    <div className="bg-white border border-border rounded-[10px] p-5 card-hover h-full">
+    <div className="bg-card border border-border rounded-[10px] p-5 card-hover h-full">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-[10px] bg-primary/10 flex items-center justify-center">
             <CalendarDays className="w-4 h-4 text-primary" />
           </div>
           <h3 className="font-semibold text-foreground text-sm">Calendar</h3>
-          {calendarConnected && (
-            <span className="inline-flex items-center gap-1 text-xs font-medium bg-emerald-50 text-emerald-700 rounded-[10px] px-2 py-0.5">
-              <Link2 className="w-3 h-3" />
-              Google Synced
-            </span>
-          )}
         </div>
         <div className="flex items-center gap-1">
           <button type="button" onClick={(e) => { e.stopPropagation(); prevMonth(); }} className="p-1.5 rounded-[10px] hover:bg-muted transition-colors" aria-label="Previous month">
@@ -196,12 +137,10 @@ export function MonthlyCalendarWidget() {
 
         {calendarDays.map((day, i) => {
           if (day === null) {
-            return <div key={`empty-${i}`} className="bg-white min-h-[48px]" />;
+            return <div key={`empty-${i}`} className="bg-card min-h-[48px]" />;
           }
 
           const dayItems = getItemsForDay(day);
-          const hasTaskItems = dayItems.some((item) => item.type === "task");
-          const hasGoogleItems = dayItems.some((item) => item.type === "google");
 
           return (
             <button
@@ -210,7 +149,7 @@ export function MonthlyCalendarWidget() {
               aria-label={`${MONTH_NAMES[month]} ${day}, ${year}`}
               aria-pressed={Boolean(isSelected(day))}
               onClick={(e) => { e.stopPropagation(); setSelectedDate(new Date(year, month, day)); }}
-              className={`relative bg-white min-h-[48px] p-1 transition-colors hover:bg-primary/5 ${
+              className={`relative bg-card min-h-[48px] p-1 transition-colors hover:bg-primary/5 ${
                 isSelected(day) ? "bg-primary/10" : ""
               }`}
             >
@@ -223,31 +162,11 @@ export function MonthlyCalendarWidget() {
               >
                 {day}
               </span>
-              {(hasTaskItems || hasGoogleItems) && (
-                <div className="flex flex-wrap gap-0.5 mt-0.5">
-                  {hasTaskItems && (
-                    <div className="w-full h-1 rounded-full bg-primary" />
-                  )}
-                  {hasGoogleItems && (
-                    <div className="w-full h-1 rounded-full bg-blue-400" />
-                  )}
-                </div>
-              )}
+              {dayItems.length > 0 && <div className="w-full h-1 rounded-full bg-primary mt-0.5" />}
             </button>
           );
         })}
       </div>
-
-      {!calendarConnected && (
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); handleConnectCalendar(); }}
-          className="w-full mb-3 flex items-center justify-center gap-2 py-2 px-3 rounded-[10px] border border-dashed border-blue-300 bg-blue-50/50 text-blue-600 text-xs font-medium hover:bg-blue-50 transition-colors"
-        >
-          <CalendarDays className="w-3.5 h-3.5" />
-          Connect Google Calendar
-        </button>
-      )}
 
       {selectedDate && (
         <div>
@@ -262,35 +181,23 @@ export function MonthlyCalendarWidget() {
                 <div
                   key={item.id}
                   className={`flex items-center gap-2 p-2 rounded-[10px] text-xs ${
-                    item.type === "google"
-                      ? "bg-blue-50"
-                      : item.status === "completed"
-                      ? "bg-emerald-50"
-                      : "bg-primary/5"
+                    item.status === "completed" ? "bg-emerald-50" : "bg-primary/5"
                   }`}
                 >
                   <div
                     className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                      item.type === "google"
-                        ? "bg-blue-500"
-                        : item.status === "completed"
-                        ? "bg-emerald-500"
-                        : "bg-primary"
+                      item.status === "completed" ? "bg-emerald-500" : "bg-primary"
                     }`}
                   />
                   <span
                     className={`font-medium truncate ${
-                      item.status === "completed"
-                        ? "text-emerald-700 line-through"
-                        : item.type === "google"
-                        ? "text-blue-700"
-                        : "text-foreground"
+                      item.status === "completed" ? "text-emerald-700 line-through" : "text-foreground"
                     }`}
                   >
                     {item.title}
                   </span>
                   <span className="ml-auto text-muted-foreground flex-shrink-0">
-                    {item.type === "google" ? "Google" : item.subject}
+                    {item.subject}
                   </span>
                 </div>
               ))}
@@ -299,23 +206,6 @@ export function MonthlyCalendarWidget() {
         </div>
       )}
 
-      {/* Legend */}
-      {calendarConnected && (
-        <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <div className="w-2 h-2 rounded-full bg-primary" />
-            Tasks
-          </div>
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <div className="w-2 h-2 rounded-full bg-blue-400" />
-            Google Calendar
-          </div>
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <div className="w-2 h-2 rounded-full bg-emerald-500" />
-            Completed
-          </div>
-        </div>
-      )}
     </div>
   );
 }

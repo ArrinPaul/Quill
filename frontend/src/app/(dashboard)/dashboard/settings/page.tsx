@@ -1,10 +1,12 @@
 "use client";
+import { useEscape } from "@/hooks/useEscape";
 import { toast } from 'sonner';
 
 import { useEffect, useState } from "react";
-import { Calendar, Key01 as Key, Loading01 as Loader2, Plus, Save01 as Save, Settings01 as Settings, Shield02 as ShieldAlert, ShieldTick as ShieldCheck, Stars01 as Sparkles, User01 as User, XClose as X } from "@untitledui/icons";
+import { Key01 as Key, Loading01 as Loader2, Plus, Save01 as Save, Settings01 as Settings, Shield02 as ShieldAlert, ShieldTick as ShieldCheck, Stars01 as Sparkles, User01 as User, XClose as X } from "@untitledui/icons";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
+import { ThemeToggle } from "@/components/shared/ThemeToggle";
 
 const branches = ["CSE", "IT", "ECE", "EEE", "ME", "CE", "Other"];
 const years = [1, 2, 3, 4];
@@ -22,13 +24,12 @@ export default function SettingsPage() {
   // System states
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [calendarConnected, setCalendarConnected] = useState(false);
-  const [checkingCalendar, setCheckingCalendar] = useState(true);
 
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
+  useEscape(showDeleteConfirm && !deletingAccount, () => setShowDeleteConfirm(false));
 
   // Change password states
   const [currentPassword, setCurrentPassword] = useState("");
@@ -37,42 +38,14 @@ export default function SettingsPage() {
   const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("calendar") === "connected") {
-      setSuccessMsg("Google Calendar connected successfully!");
-      toast.success("Google Calendar connected!");
-    } else if (params.get("calendar_error")) {
-      setError("Failed to connect Google Calendar. Please try again.");
-    }
-  }, []);
-
-  useEffect(() => {
     if (user) {
       setName(user.name || "");
       setBranch(user.branch || "");
       setYear(user.year || 1);
       setSubjects(user.subjects || []);
       setLoading(false);
-      
-      // Check Google Calendar connection status
-      api.get<{ connected: boolean }>("/api/auth/google/status")
-        .then((res) => setCalendarConnected(res.connected))
-        .catch(() => setCalendarConnected(false))
-        .finally(() => setCheckingCalendar(false));
     }
   }, [user]);
-
-  const handleConnectCalendar = async () => {
-    if (!user) return;
-    setError("");
-    try {
-      // Pass the student ID as state parameter to secure per-user calendar linking
-      const res = await api.get<{ url: string }>(`/api/auth/google/url?state=${user.id}`);
-      window.location.href = res.url;
-    } catch (err) {
-      setError("Failed to generate Google Calendar link URL");
-    }
-  };
 
   const handleAddSubject = (e: React.FormEvent) => {
     e.preventDefault();
@@ -128,14 +101,17 @@ export default function SettingsPage() {
 
     if (!currentPassword || !newPassword) {
       setError("Please enter your current and new password");
+      toast.error("Please enter your current and new password");
       return;
     }
     if (newPassword.length < 6) {
       setError("New password must be at least 6 characters");
+      toast.error("New password must be at least 6 characters");
       return;
     }
     if (newPassword !== confirmNewPassword) {
       setError("New passwords do not match");
+      toast.error("New passwords do not match");
       return;
     }
 
@@ -191,56 +167,17 @@ export default function SettingsPage() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Left Side: Integrations (Calendar Link) */}
+        {/* Left Side: Appearance */}
         <div className="md:col-span-1 space-y-6">
-          <div className="bg-white border border-border rounded-[10px] p-5 shadow-sm space-y-4">
-            <h3 className="font-semibold text-foreground text-base flex items-center gap-2 border-b border-border pb-3">
-              <Calendar className="w-4 h-4 text-primary" />
-              Integrations
-            </h3>
-            
-            <div className="space-y-3">
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Connect your Google account to sync assignments with your personal Google Calendar automatically.
-              </p>
-
-              {checkingCalendar ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground animate-pulse py-2">
-                  <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                  Checking connection...
-                </div>
-              ) : calendarConnected ? (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 p-3 bg-green-500/10 border border-green-500/20 rounded-[10px] text-green-700 text-sm">
-                    <ShieldCheck className="w-5 h-5 flex-shrink-0" />
-                    <span className="font-semibold">Calendar Synced</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground text-center">
-                    All set! New deadlines with Sync checked will populate in Google Calendar.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3 pt-2">
-                  <div className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-[10px] text-destructive text-sm">
-                    <ShieldAlert className="w-5 h-5 flex-shrink-0" />
-                    <span className="font-semibold">Not Connected</span>
-                  </div>
-                  <button
-                    onClick={handleConnectCalendar}
-                    className="w-full py-2.5 bg-primary text-primary-foreground text-sm font-semibold rounded-[10px] hover:opacity-90 transition-standard cursor-pointer flex items-center justify-center gap-2 shadow-sm"
-                  >
-                    <Sparkles className="w-4 h-4" />
-                    Sync Google Calendar
-                  </button>
-                </div>
-              )}
-            </div>
+          <div className="bg-card border border-border rounded-[10px] p-5 shadow-sm space-y-4">
+            <h3 className="font-semibold text-foreground text-base border-b border-border pb-3">Appearance</h3>
+            <ThemeToggle showLabel className="w-full justify-center border border-border py-2.5" />
           </div>
         </div>
 
         {/* Right Side: Profile Details */}
         <div className="md:col-span-2 space-y-6">
-          <div className="bg-white border border-border rounded-[10px] p-6 shadow-sm space-y-6">
+          <div className="bg-card border border-border rounded-[10px] p-6 shadow-sm space-y-6">
             <h3 className="font-semibold text-foreground text-base flex items-center gap-2 border-b border-border pb-3">
               <User className="w-4 h-4 text-primary" />
               Student Profile
@@ -281,7 +218,7 @@ export default function SettingsPage() {
                   <select
                     value={branch}
                     onChange={(e) => setBranch(e.target.value)}
-                    className="w-full px-3 py-2 border border-border rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-white"
+                    className="w-full px-3 py-2 border border-border rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-card"
                   >
                     <option value="">Select</option>
                     {branches.map((b) => (
@@ -296,7 +233,7 @@ export default function SettingsPage() {
                   <select
                     value={year}
                     onChange={(e) => setYear(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-border rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-white"
+                    className="w-full px-3 py-2 border border-border rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-card"
                   >
                     {years.map((y) => (
                       <option key={y} value={y}>Year {y}</option>
@@ -382,7 +319,7 @@ export default function SettingsPage() {
           </div>
 
           {/* Change Password Card */}
-          <div className="bg-white border border-border rounded-[10px] p-6 shadow-sm space-y-4">
+          <div className="bg-card border border-border rounded-[10px] p-6 shadow-sm space-y-4">
             <h3 className="font-semibold text-foreground text-base flex items-center gap-2 border-b border-border pb-3">
               <Key className="w-4 h-4 text-primary" />
               Change Password
@@ -479,7 +416,7 @@ export default function SettingsPage() {
       </div>
 
       {showDeleteConfirm && (
-        <div
+        <div role="dialog" aria-modal="true"
           className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200"
           onClick={() => !deletingAccount && setShowDeleteConfirm(false)}
         >
@@ -487,7 +424,7 @@ export default function SettingsPage() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="delete-account-title"
-            className="bg-white rounded-[12px] border border-border shadow-2xl max-w-md w-full p-6 space-y-4"
+            className="bg-card rounded-[12px] border border-border shadow-2xl max-w-md w-full p-6 space-y-4"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 id="delete-account-title" className="text-lg font-bold text-foreground">

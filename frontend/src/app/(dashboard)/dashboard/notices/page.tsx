@@ -24,6 +24,38 @@ export default function NoticesPage() {
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const resetForm = () => {
+    setEditingId(null);
+    setNoticeText("");
+    setEventTitle("");
+    setEventDate("");
+  };
+
+  const startEdit = (notice: Notice) => {
+    setEditingId(notice.id);
+    setNoticeText(notice.notice_text);
+    setEventTitle(notice.event_title || "");
+    setEventDate(notice.event_date || "");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleDelete = async (notice: Notice) => {
+    if (!confirm("Delete this notice?")) return;
+    setError("");
+    setSuccessMsg("");
+    try {
+      await api.delete(`/api/notices/${notice.id}`);
+      setNotices((prev) => prev.filter((n) => n.id !== notice.id));
+      setActiveNotice(null);
+      if (editingId === notice.id) resetForm();
+      setSuccessMsg("Notice deleted.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete notice");
+    }
+  };
+
   const fetchNotices = async (showLoading = true) => {
     if (showLoading) setLoading(true);
     setError("");
@@ -55,20 +87,26 @@ export default function NoticesPage() {
 
     setSummarizing(true);
     try {
-      const res = await api.post<{ notice: Notice }>("/api/notices", {
+      const body = {
         notice_text: noticeText,
         event_title: eventTitle || null,
         event_date: eventDate || null,
-      });
+      };
+      const res = editingId
+        ? await api.put<{ notice: Notice }>(`/api/notices/${editingId}`, body)
+        : await api.post<{ notice: Notice }>("/api/notices", body);
       
-      setNoticeText("");
-      setEventTitle("");
-      setEventDate("");
-      
-      // Update list and select the newly created notice
-      setNotices((prev) => [res.notice, ...prev]);
+      // Update list and select the saved notice
+      setNotices((prev) =>
+        editingId ? prev.map((n) => (n.id === res.notice.id ? res.notice : n)) : [res.notice, ...prev]
+      );
+      resetForm();
       setActiveNotice(res.notice);
-      setSuccessMsg("Notice summarized successfully!");
+      setSuccessMsg(
+        res.notice.ai_summary
+          ? "Notice summarized successfully!"
+          : "Notice saved, but the AI summary is unavailable right now."
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "AI summarization failed");
     } finally {
@@ -139,16 +177,17 @@ export default function NoticesPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0 overflow-y-auto pb-6 pr-1">
         {/* Notice Form Input */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white/60 backdrop-blur-xl border border-white/40 rounded-[24px] p-6 shadow-sm space-y-5 relative overflow-hidden">
+          <div className="bg-card/60 backdrop-blur-xl border border-white/40 rounded-[24px] p-6 shadow-sm space-y-5 relative overflow-hidden">
             <div className="absolute top-[-20%] left-[-10%] w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
             <div className="relative z-10">
               <label className="block text-sm font-semibold text-foreground/80 mb-2">
                 Paste Notice Text <span className="text-destructive">*</span>
               </label>
               <textarea
+                aria-label="Notice text"
                 value={noticeText}
                 onChange={(e) => setNoticeText(e.target.value)}
-                className="w-full h-44 px-4 py-3 bg-white/80 border border-black/5 rounded-[16px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all resize-none font-sans placeholder:text-muted-foreground/60 shadow-sm scrollbar-thin"
+                className="w-full h-44 px-4 py-3 bg-card/80 border border-foreground/5 rounded-[16px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all resize-none font-sans placeholder:text-muted-foreground/60 shadow-sm scrollbar-thin"
                 placeholder="Paste the full, detailed announcement text from your college portal or group chat here..."
                 required
               />
@@ -162,9 +201,10 @@ export default function NoticesPage() {
                 </label>
                 <input
                   type="text"
+                  aria-label="Associated event title"
                   value={eventTitle}
                   onChange={(e) => setEventTitle(e.target.value)}
-                  className="w-full px-4 py-3 bg-white/80 border border-black/5 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all placeholder:text-muted-foreground/60 shadow-sm"
+                  className="w-full px-4 py-3 bg-card/80 border border-foreground/5 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all placeholder:text-muted-foreground/60 shadow-sm"
                   placeholder="e.g., End Sem Exam"
                 />
               </div>
@@ -175,14 +215,15 @@ export default function NoticesPage() {
                 </label>
                 <input
                   type="date"
+                  aria-label="Associated event date"
                   value={eventDate}
                   onChange={(e) => setEventDate(e.target.value)}
-                  className="w-full px-4 py-3 bg-white/80 border border-black/5 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all shadow-sm"
+                  className="w-full px-4 py-3 bg-card/80 border border-foreground/5 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all shadow-sm"
                 />
               </div>
             </div>
 
-            <div className="flex gap-3 pt-2 relative z-10 border-t border-black/5 mt-4 pt-5">
+            <div className="flex gap-3 pt-2 relative z-10 border-t border-foreground/5 mt-4 pt-5">
               <button
                 onClick={handleSummarize}
                 disabled={summarizing || !noticeText.trim()}
@@ -196,34 +237,47 @@ export default function NoticesPage() {
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4" />
-                    Summarize with AI
+                    {editingId ? "Save changes" : "Summarize with AI"}
                   </>
                 )}
               </button>
+              {editingId && (
+                <button type="button" onClick={resetForm} className="px-4 py-2.5 border border-border rounded-[12px] text-sm font-semibold cursor-pointer">
+                  Cancel
+                </button>
+              )}
             </div>
           </div>
 
           {/* Active Notice Summary View */}
           {activeNotice && (
-            <div className="bg-gradient-to-br from-white/90 to-white/50 backdrop-blur-xl border border-white/40 rounded-[24px] p-6 shadow-sm space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="bg-gradient-to-br from-white/90 dark:from-card to-white/50 dark:to-card backdrop-blur-xl border border-white/40 rounded-[24px] p-6 shadow-sm space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="flex flex-wrap justify-between items-start gap-4">
                 <div>
                   <h3 className="font-bold text-foreground text-xl flex items-center gap-2">
                     <Sparkles className="w-5 h-5 text-primary" />
                     AI-Generated Summary
                   </h3>
-                  <p className="text-xs font-medium text-muted-foreground mt-1.5 bg-black/5 inline-block px-2 py-1 rounded-[8px]">
+                  <p className="text-xs font-medium text-muted-foreground mt-1.5 bg-foreground/5 inline-block px-2 py-1 rounded-[8px]">
                     Created on {new Date(activeNotice.created_at).toLocaleString()}
                   </p>
                 </div>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => startEdit(activeNotice)} className="px-3 py-1.5 border border-border rounded-[10px] text-xs font-semibold hover:bg-accent cursor-pointer">
+                    Edit
+                  </button>
+                  <button type="button" onClick={() => handleDelete(activeNotice)} className="px-3 py-1.5 border border-destructive/30 text-destructive rounded-[10px] text-xs font-semibold hover:bg-destructive/10 cursor-pointer">
+                    Delete
+                  </button>
+                </div>
               </div>
 
-              <div className="p-5 bg-white/80 border border-black/5 rounded-[16px] text-sm text-foreground space-y-2 whitespace-pre-line leading-relaxed shadow-sm">
+              <div className="p-5 bg-card/80 border border-foreground/5 rounded-[16px] text-sm text-foreground space-y-2 whitespace-pre-line leading-relaxed shadow-sm">
                 {activeNotice.ai_summary || "No summary generated for this notice."}
               </div>
 
               {(activeNotice.event_title || activeNotice.event_date) && (
-                <div className="flex flex-wrap gap-4 text-xs font-medium text-muted-foreground pt-3 border-t border-black/5">
+                <div className="flex flex-wrap gap-4 text-xs font-medium text-muted-foreground pt-3 border-t border-foreground/5">
                   {activeNotice.event_title && (
                     <div className="flex items-center gap-1.5 bg-primary/5 text-primary px-3 py-1.5 rounded-[10px]">
                       <Sparkles className="w-3.5 h-3.5" />
@@ -243,8 +297,8 @@ export default function NoticesPage() {
         </div>
 
         {/* Notices History Sidebar */}
-        <div className="bg-white/60 backdrop-blur-xl border border-white/40 rounded-[24px] p-5 shadow-sm flex flex-col h-full min-h-[400px]">
-          <div className="flex items-center justify-between border-b border-black/5 pb-4 mb-4">
+        <div className="bg-card/60 backdrop-blur-xl border border-white/40 rounded-[24px] p-5 shadow-sm flex flex-col h-full min-h-[400px]">
+          <div className="flex items-center justify-between border-b border-foreground/5 pb-4 mb-4">
             <h3 className="font-bold text-foreground flex items-center gap-2">
               <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center">
                 <Megaphone className="w-4 h-4" />
@@ -256,7 +310,7 @@ export default function NoticesPage() {
               aria-label="Refresh notices"
               title="Refresh notices"
               onClick={() => fetchNotices(false)}
-              className="p-2 hover:bg-black/5 rounded-full text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+              className="p-2 hover:bg-foreground/5 rounded-full text-muted-foreground hover:text-foreground transition-all cursor-pointer"
             >
               <RefreshCw className="w-4 h-4" />
             </button>
@@ -268,7 +322,7 @@ export default function NoticesPage() {
               <p className="text-xs font-medium text-muted-foreground">Loading notices...</p>
             </div>
           ) : filteredNotices.length === 0 ? (
-            <div className="bg-white/80 border border-black/5 rounded-[16px] p-8 text-center shadow-sm my-auto mx-2">
+            <div className="bg-card/80 border border-foreground/5 rounded-[16px] p-8 text-center shadow-sm my-auto mx-2">
               <Megaphone className="w-10 h-10 text-muted-foreground/50 mx-auto mb-3" />
               <h3 className="text-base font-bold text-foreground mb-1.5">
                 {timelineFilter === "upcoming"
@@ -292,7 +346,7 @@ export default function NoticesPage() {
                   className={`w-full text-left p-4 rounded-[16px] transition-all duration-300 border text-xs flex flex-col gap-1.5 cursor-pointer hover:-translate-y-0.5 group ${
                     activeNotice?.id === notice.id
                       ? "bg-gradient-to-r from-primary/10 to-primary/5 border-primary/30 shadow-sm"
-                      : "bg-white border-black/5 hover:border-primary/30 hover:shadow-sm"
+                      : "bg-card border-foreground/5 hover:border-primary/30 hover:shadow-sm"
                   }`}
                 >
                   <p className={`font-bold line-clamp-1 ${activeNotice?.id === notice.id ? "text-primary" : "text-foreground group-hover:text-primary"}`}>
@@ -301,9 +355,9 @@ export default function NoticesPage() {
                   <p className="text-muted-foreground line-clamp-2 leading-relaxed">
                     {notice.ai_summary || notice.notice_text}
                   </p>
-                  <div className="flex items-center justify-between text-[10px] font-medium text-muted-foreground mt-2 pt-2 border-t border-black/5 w-full">
+                  <div className="flex items-center justify-between text-[10px] font-medium text-muted-foreground mt-2 pt-2 border-t border-foreground/5 w-full">
                     <span>{new Date(notice.created_at).toLocaleDateString()}</span>
-                    <span className={`inline-block px-2.5 py-1 rounded-full ${
+                    {notice.broadcast_status && <span className={`inline-block px-2.5 py-1 rounded-full ${
                       notice.broadcast_status === "sent" 
                         ? "bg-green-500/15 text-green-700" 
                         : notice.broadcast_status === "failed"
@@ -311,7 +365,7 @@ export default function NoticesPage() {
                           : "bg-yellow-500/15 text-yellow-700"
                     }`}>
                       {notice.broadcast_status}
-                    </span>
+                    </span>}
                   </div>
                 </button>
               ))}

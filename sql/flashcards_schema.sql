@@ -17,6 +17,10 @@ CREATE TABLE public.flashcards (
   back TEXT NOT NULL,
   citation TEXT,
   status TEXT DEFAULT 'unseen' CHECK (status IN ('unseen', 'review', 'mastered')),
+  repetitions INTEGER DEFAULT 0,
+  interval_days INTEGER DEFAULT 0,
+  ease_factor NUMERIC DEFAULT 2.5,
+  next_review_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
 );

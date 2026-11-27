@@ -1,9 +1,20 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useAuth } from "@/hooks/useAuth";
 import { Bell01 as Bell, CalendarCheck01 as CalendarClock, CheckCircle } from "@untitledui/icons";
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (!loading && user && (pathname === "/login" || pathname === "/signup")) router.replace("/dashboard");
+  }, [loading, user, pathname, router]);
+
   return (
     <div className="min-h-screen flex flex-col lg:flex-row bg-background">
       <div className="lg:hidden flex items-center justify-between px-6 py-4 bg-primary text-white">
@@ -25,11 +36,11 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             Your AI-Powered Student Hub
           </h1>
           <p className="text-white/85 mb-8 text-sm leading-relaxed">
-            Never miss a deadline again. Smart reminders, AI summaries, and attendance tracking — all in one place.
+            Never miss a deadline again. Deadline tracking, AI summaries, and attendance tracking — all in one place.
           </p>
           <div className="space-y-4">
             {[
-              { icon: CalendarClock, text: "Smart deadline & calendar sync" },
+              { icon: CalendarClock, text: "Deadline tracking & calendar view" },
               { icon: CheckCircle, text: "AI notice summarization" },
               { icon: Bell, text: "Attendance risk alerts" },
             ].map((item) => (
