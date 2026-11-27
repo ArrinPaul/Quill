@@ -1,0 +1,28 @@
+language: "en-US"
+early_access: false
+
+reviews:
+  profile: "assertive"
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - main
+  path_instructions:
+    - path: "backend/src/**"
+      instructions: |
+        Verify every user-data query filters by req.student.id, new routes use authMiddleware and Zod validation (400/404, never raw 500s), and no secrets or .env values are logged.
+    - path: "frontend/src/**"
+      instructions: |
+        Verify all API calls go through src/lib/api.ts, UI uses semantic light/dark theme tokens (no hardcoded hex), and interactive elements are keyboard-accessible and responsive at 375px and 1440px.
+    - path: "sql/**"
+      instructions: |
+        Verify migrations are idempotent, enable RLS on new tables, grant ALL to service_role, end with NOTIFY pgrst, 'reload schema';, and contain no destructive SQL.
+
+chat:
+  auto_reply: true
