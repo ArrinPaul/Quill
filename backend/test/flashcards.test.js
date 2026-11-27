@@ -1,6 +1,7 @@
 const { describe, it, before, after } = require("node:test");
 const assert = require("node:assert/strict");
 const { startTestServer } = require("./helpers/testApp");
+const { calculateSm2 } = require("../src/routes/flashcards");
 
 describe("Flashcards ownership and validation (all routes)", () => {
   let ctx;
@@ -123,5 +124,117 @@ describe("Flashcards ownership and validation (all routes)", () => {
 
     const listAEnd = await ctx.request("GET", "/api/flashcards/decks", { token: userA.token });
     assert.equal(listAEnd.data.decks.length, 0);
+  });
+
+  it("renames a deck via PUT /api/flashcards/decks/:id with auth, validation, and ownership checks", async () => {
+    const createRes = await ctx.request("POST", "/api/flashcards/decks", {
+      token: userA.token,
+      body: {
+        title: "Original Deck",
+        flashcards: [{ front: "Q1", back: "A1" }],
+      },
+    });
+    assert.equal(createRes.status, 201);
+    const createdDeck = createRes.data.deck;
+
+    // 401 unauthenticated
+    const unauthRes = await ctx.request("PUT", `/api/flashcards/decks/${createdDeck.id}`, {
+      body: { title: "No Auth" },
+    });
+    assert.equal(unauthRes.status, 401);
+
+    // 404 invalid UUID
+    const badIdRes = await ctx.request("PUT", "/api/flashcards/decks/not-a-uuid", {
+      token: userA.token,
+      body: { title: "Valid Title" },
+    });
+    assert.equal(badIdRes.status, 404);
+
+    // 400 invalid title (empty / whitespace / missing / too long)
+    const emptyTitleRes = await ctx.request("PUT", `/api/flashcards/decks/${createdDeck.id}`, {
+      token: userA.token,
+      body: { title: "   " },
+    });
+    assert.equal(emptyTitleRes.status, 400);
+
+    const missingTitleRes = await ctx.request("PUT", `/api/flashcards/decks/${createdDeck.id}`, {
+      token: userA.token,
+      body: {},
+    });
+    assert.equal(missingTitleRes.status, 400);
+
+    // 404 other user
+    const otherUserRes = await ctx.request("PUT", `/api/flashcards/decks/${createdDeck.id}`, {
+      token: userB.token,
+      body: { title: "Stolen Title" },
+    });
+    assert.equal(otherUserRes.status, 404);
+
+    // 404 missing deck UUID
+    const missingDeckRes = await ctx.request(
+      "PUT",
+      "/api/flashcards/decks/00000000-0000-4000-8000-000000000099",
+      {
+        token: userA.token,
+        body: { title: "Ghost Deck" },
+      }
+    );
+    assert.equal(missingDeckRes.status, 404);
+
+    // 200 success
+    const renameRes = await ctx.request("PUT", `/api/flashcards/decks/${createdDeck.id}`, {
+      token: userA.token,
+      body: { title: "  Renamed Deck  " },
+    });
+    assert.equal(renameRes.status, 200);
+    assert.equal(renameRes.data.deck.id, createdDeck.id);
+    assert.equal(renameRes.data.deck.title, "Renamed Deck");
+  });
+});
+
+describe("SM-2 spaced repetition calculation", () => {
+  const fixedNow = Date.UTC(2026, 0, 1, 12, 0, 0);
+
+  it("advances repetitions, intervals, and ease factor on mastered", () => {
+    const first = calculateSm2({ repetitions: 0, interval_days: 0, ease_factor: 2.5 }, "mastered", fixedNow);
+    assert.equal(first.repetitions, 1);
+    assert.equal(first.intervalDays, 1);
+    assert.equal(first.easeFactor, 2.6);
+    assert.equal(first.nextReviewAt, new Date(fixedNow + 86400000).toISOString());
+
+    const second = calculateSm2(
+      { repetitions: first.repetitions, interval_days: first.intervalDays, ease_factor: first.easeFactor },
+      "mastered",
+      fixedNow
+    );
+    assert.equal(second.repetitions, 2);
+    assert.equal(second.intervalDays, 6);
+    assert.ok(Math.abs(second.easeFactor - 2.7) < 1e-9);
+    assert.equal(second.nextReviewAt, new Date(fixedNow + 6 * 86400000).toISOString());
+
+    const third = calculateSm2(
+      { repetitions: second.repetitions, interval_days: second.intervalDays, ease_factor: second.easeFactor },
+      "mastered",
+      fixedNow
+    );
+    assert.equal(third.repetitions, 3);
+    assert.equal(third.intervalDays, Math.round(6 * 2.7));
+    assert.ok(Math.abs(third.easeFactor - 2.8) < 1e-9);
+  });
+
+  it("resets repetitions and interval and clamps ease factor to 1.3 on review", () => {
+    const res = calculateSm2({ repetitions: 4, interval_days: 15, ease_factor: 1.4 }, "review", fixedNow);
+    assert.equal(res.repetitions, 0);
+    assert.equal(res.intervalDays, 0);
+    assert.equal(res.easeFactor, 1.3);
+    assert.equal(res.nextReviewAt, new Date(fixedNow).toISOString());
+  });
+
+  it("resets repetitions and interval on unseen without altering ease factor", () => {
+    const res = calculateSm2({ repetitions: 3, interval_days: 10, ease_factor: 2.2 }, "unseen", fixedNow);
+    assert.equal(res.repetitions, 0);
+    assert.equal(res.intervalDays, 0);
+    assert.equal(res.easeFactor, 2.2);
+    assert.equal(res.nextReviewAt, new Date(fixedNow).toISOString());
   });
 });

@@ -18,6 +18,10 @@ const createDeckSchema = z.object({
   flashcards: z.array(cardInputSchema).min(1).max(LIMITS.ARRAY_ITEMS),
 });
 
+const renameDeckSchema = z.object({
+  title: titleSchema,
+});
+
 const updateCardStatusSchema = z.object({
   status: cardStatusSchema,
 });
@@ -26,5 +30,6 @@ module.exports = {
   deckIdParamSchema,
   cardInputSchema,
   createDeckSchema,
+  renameDeckSchema,
   updateCardStatusSchema,
 };
