@@ -93,4 +93,74 @@ describe("Tasks ownership and validation", () => {
     assert.equal(updateLow.status, 200);
     assert.equal(updateLow.data.task.importance, "low");
   });
+
+  it("supports in_progress status on POST and PUT", async () => {
+    const deadline = new Date(Date.now() + 10800_000).toISOString();
+    const createRes = await ctx.request("POST", "/api/tasks", {
+      token: userA.token,
+      body: { title: "Draft Essay", subject: "ENG101", deadline, status: "in_progress" },
+    });
+    assert.equal(createRes.status, 200);
+    assert.equal(createRes.data.task.status, "in_progress");
+
+    const updateRes = await ctx.request("PUT", `/api/tasks/${taskA.id}`, {
+      token: userA.token,
+      body: { status: "in_progress" },
+    });
+    assert.equal(updateRes.status, 200);
+    assert.equal(updateRes.data.task.status, "in_progress");
+  });
+
+  it("creates a +7d copy on completing a weekly task and never duplicates on un-complete + re-complete", async () => {
+    const deadline = "2026-12-01T10:00:00.000Z";
+    const reminder = "2026-11-30T10:00:00.000Z";
+
+    const createRes = await ctx.request("POST", "/api/tasks", {
+      token: userA.token,
+      body: {
+        title: "Weekly Quiz",
+        subject: "MATH101",
+        deadline,
+        reminder_time: reminder,
+        repeat: "weekly",
+      },
+    });
+    assert.equal(createRes.status, 200);
+    const weeklyTask = createRes.data.task;
+    assert.equal(weeklyTask.repeat, "weekly");
+
+    const completeRes = await ctx.request("PUT", `/api/tasks/${weeklyTask.id}`, {
+      token: userA.token,
+      body: { status: "completed" },
+    });
+    assert.equal(completeRes.status, 200);
+    assert.equal(completeRes.data.task.status, "completed");
+    assert.ok(completeRes.data.nextTask);
+    assert.equal(completeRes.data.nextTask.status, "pending");
+    assert.equal(completeRes.data.nextTask.repeat, "weekly");
+    assert.equal(completeRes.data.nextTask.repeat_parent, weeklyTask.id);
+    assert.equal(completeRes.data.nextTask.deadline, "2026-12-08T10:00:00.000Z");
+    assert.equal(completeRes.data.nextTask.reminder_time, "2026-12-07T10:00:00.000Z");
+
+    const beforeList = await ctx.request("GET", "/api/tasks", { token: userA.token });
+    const countBefore = beforeList.data.tasks.length;
+
+    const uncompleteRes = await ctx.request("PUT", `/api/tasks/${weeklyTask.id}`, {
+      token: userA.token,
+      body: { status: "pending" },
+    });
+    assert.equal(uncompleteRes.status, 200);
+    assert.equal(uncompleteRes.data.task.status, "pending");
+
+    const recompleteRes = await ctx.request("PUT", `/api/tasks/${weeklyTask.id}`, {
+      token: userA.token,
+      body: { status: "completed" },
+    });
+    assert.equal(recompleteRes.status, 200);
+    assert.equal(recompleteRes.data.task.status, "completed");
+    assert.equal(recompleteRes.data.nextTask, undefined);
+
+    const afterList = await ctx.request("GET", "/api/tasks", { token: userA.token });
+    assert.equal(afterList.data.tasks.length, countBefore);
+  });
 });

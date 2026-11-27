@@ -59,8 +59,10 @@ function createFakeSupabase(initialData = {}) {
       updated_at: row.updated_at ?? now,
       ...clone(row),
     };
-    if (tableName === "tasks" && record.status === undefined) {
-      record.status = "pending";
+    if (tableName === "tasks") {
+      if (record.status === undefined) record.status = "pending";
+      if (record.repeat === undefined) record.repeat = "none";
+      if (record.repeat_parent === undefined) record.repeat_parent = null;
     }
     return record;
   }
@@ -208,8 +210,25 @@ function createFakeSupabase(initialData = {}) {
 
       if (state.operation === "insert") {
         const items = Array.isArray(state.payload) ? state.payload : [state.payload];
-        const inserted = items.map((item) => {
-          const rec = buildRowDefaults(tableName, item);
+        const built = items.map((item) => buildRowDefaults(tableName, item));
+        if (tableName === "tasks") {
+          for (const rec of built) {
+            if (
+              rec.repeat_parent !== null &&
+              rec.repeat_parent !== undefined &&
+              table.some((r) => r.repeat_parent === rec.repeat_parent)
+            ) {
+              return {
+                data: null,
+                error: {
+                  message: 'duplicate key value violates unique constraint "idx_tasks_repeat_parent"',
+                  code: "23505",
+                },
+              };
+            }
+          }
+        }
+        const inserted = built.map((rec) => {
           table.push(rec);
           return rec;
         });

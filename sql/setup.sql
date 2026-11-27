@@ -27,7 +27,9 @@ CREATE TABLE public.tasks (
   reminder_time TIMESTAMPTZ,
   add_to_calendar BOOLEAN DEFAULT TRUE,
   importance TEXT NOT NULL DEFAULT 'normal' CHECK (importance IN ('low','normal','high')),
-  status TEXT CHECK (status IN ('pending','completed','cancelled')) DEFAULT 'pending',
+  status TEXT CHECK (status IN ('pending','in_progress','completed','cancelled')) DEFAULT 'pending',
+  repeat TEXT NOT NULL DEFAULT 'none' CHECK (repeat IN ('none','weekly')),
+  repeat_parent UUID REFERENCES public.tasks(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -65,6 +67,7 @@ CREATE TABLE public.preferences (
 -- Indexes
 CREATE INDEX idx_tasks_student_id ON public.tasks(student_id);
 CREATE INDEX idx_tasks_deadline ON public.tasks(deadline);
+CREATE UNIQUE INDEX idx_tasks_repeat_parent ON public.tasks(repeat_parent) WHERE repeat_parent IS NOT NULL;
 CREATE INDEX idx_notices_student_id ON public.notices(student_id);
 CREATE INDEX idx_attendance_student_id ON public.attendance(student_id);
 

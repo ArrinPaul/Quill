@@ -79,8 +79,10 @@ router.get("/feed/:student_id", validate({ params: studentIdParamSchema }), asyn
       "X-WR-TIMEZONE:UTC",
     ];
 
-    // Add Tasks
-    (tasks || []).forEach((t) => {
+    // Add Tasks (exclude cancelled)
+    (tasks || [])
+      .filter((t) => t.status !== "cancelled")
+      .forEach((t) => {
       const dtStart = formatIcsDate(t.deadline);
       const dtEnd = formatIcsDate(new Date(new Date(t.deadline).getTime() + 3600000));
       icsLines.push(

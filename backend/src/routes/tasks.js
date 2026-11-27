@@ -68,24 +68,36 @@ router.get("/upcoming", async (req, res, next) => {
   }
 });
 
+const WEEK_MS = 7 * 86400000;
+
+function addSevenDaysIso(dateStr) {
+  return new Date(new Date(dateStr).getTime() + WEEK_MS).toISOString();
+}
+
 router.post("/", validate({ body: createTaskSchema }), async (req, res, next) => {
   try {
-    const { title, subject, description, deadline, reminder_time, add_to_calendar, importance } = req.body;
+    const { title, subject, description, deadline, reminder_time, add_to_calendar, importance, status, repeat } = req.body;
 
     const reminder = reminder_time || new Date(new Date(deadline).getTime() - 86400000).toISOString();
 
+    const insertPayload = {
+      student_id: req.student.id,
+      title,
+      subject,
+      description,
+      deadline,
+      reminder_time: reminder,
+      add_to_calendar: add_to_calendar !== false,
+      importance: importance ?? "normal",
+      repeat: repeat ?? "none",
+    };
+    if (status !== undefined) {
+      insertPayload.status = status;
+    }
+
     const { data: task, error } = await getClient()
       .from("tasks")
-      .insert({
-        student_id: req.student.id,
-        title,
-        subject,
-        description,
-        deadline,
-        reminder_time: reminder,
-        add_to_calendar: add_to_calendar !== false,
-        importance: importance ?? "normal",
-      })
+      .insert(insertPayload)
       .select()
       .single();
 
@@ -101,11 +113,14 @@ router.post("/", validate({ body: createTaskSchema }), async (req, res, next) =>
 
 router.put("/:id", validate({ params: idParamSchema, body: updateTaskSchema }), async (req, res, next) => {
   try {
-    const { title, subject, description, deadline, reminder_time, status, importance } = req.body;
+    const { title, subject, description, deadline, reminder_time, status, importance, repeat } = req.body;
 
     const updatePayload = { title, subject, description, deadline, status };
     if (importance !== undefined) {
       updatePayload.importance = importance;
+    }
+    if (repeat !== undefined) {
+      updatePayload.repeat = repeat;
     }
     if (status !== undefined) {
       const { data: current } = await getClient()
@@ -131,10 +146,39 @@ router.put("/:id", validate({ params: idParamSchema, body: updateTaskSchema }), 
 
     if (error) throw error;
     if (!task) return res.status(404).json({ message: "Task not found" });
+
+    let nextTask;
     if (status === "completed") {
       await logActivity(req.student.id, "task_completed", task.title, task.id);
+
+      if (task.repeat === "weekly") {
+        const { data: insertedNext, error: nextError } = await getClient()
+          .from("tasks")
+          .insert({
+            student_id: req.student.id,
+            title: task.title,
+            subject: task.subject,
+            description: task.description ?? null,
+            deadline: addSevenDaysIso(task.deadline),
+            reminder_time: task.reminder_time ? addSevenDaysIso(task.reminder_time) : null,
+            add_to_calendar: task.add_to_calendar !== false,
+            importance: task.importance ?? "normal",
+            status: "pending",
+            repeat: "weekly",
+            repeat_parent: task.id,
+          })
+          .select()
+          .single();
+
+        if (nextError) {
+          if (nextError.code !== "23505") throw nextError;
+        } else {
+          nextTask = insertedNext;
+        }
+      }
     }
-    res.json({ task });
+
+    res.json(nextTask ? { task, nextTask } : { task });
   } catch (error) {
     next(error);
   }

@@ -1,8 +1,10 @@
-export type TaskStatus = "pending" | "completed" | "cancelled";
+export type TaskStatus = "pending" | "in_progress" | "completed" | "cancelled";
 
 export type TaskImportance = "low" | "normal" | "high";
 
-export type TaskFilter = "today" | "upcoming" | "completed" | "all";
+export type TaskRepeat = "none" | "weekly";
+
+export type TaskFilter = "today" | "upcoming" | "in_progress" | "completed" | "all";
 
 export interface Task {
   id: string;
@@ -15,6 +17,8 @@ export interface Task {
   add_to_calendar: boolean;
   importance?: TaskImportance;
   status: TaskStatus;
+  repeat?: TaskRepeat;
+  repeat_parent?: string | null;
   n8n_triggered: boolean;
   created_at: string;
 }

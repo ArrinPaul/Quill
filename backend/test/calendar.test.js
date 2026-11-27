@@ -20,6 +20,26 @@ describe("Calendar feed signature", () => {
         deadline: new Date(Date.now() + 86400_000).toISOString(),
       },
     });
+
+    await ctx.request("POST", "/api/tasks", {
+      token: userA.token,
+      body: {
+        title: "In Progress Calendar Task",
+        subject: "MATH101",
+        deadline: new Date(Date.now() + 86400_000).toISOString(),
+        status: "in_progress",
+      },
+    });
+
+    await ctx.request("POST", "/api/tasks", {
+      token: userA.token,
+      body: {
+        title: "Cancelled Calendar Task",
+        subject: "MATH101",
+        deadline: new Date(Date.now() + 86400_000).toISOString(),
+        status: "cancelled",
+      },
+    });
   });
 
   after(async () => {
@@ -41,6 +61,8 @@ describe("Calendar feed signature", () => {
     assert.match(validFeed.headers.get("content-type") || "", /text\/calendar/);
     assert.match(validFeed.text, /BEGIN:VCALENDAR/);
     assert.match(validFeed.text, /Calendar Task/);
+    assert.match(validFeed.text, /In Progress Calendar Task/);
+    assert.doesNotMatch(validFeed.text, /Cancelled Calendar Task/);
 
     const noToken = await ctx.request("GET", `/api/calendar/feed/${userA.student.id}`);
     assert.equal(noToken.status, 401);

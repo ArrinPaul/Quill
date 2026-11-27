@@ -105,6 +105,11 @@ export function TodayTasksWidget({ tasks = [] }: TodayTasksWidgetProps) {
                 <p className="text-sm font-medium text-foreground truncate">{task.title}</p>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-xs text-muted-foreground">{task.subject}</span>
+                  {task.status === "in_progress" && (
+                    <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                      In progress
+                    </span>
+                  )}
                   <PriorityBadge task={task} />
                 </div>
               </div>
