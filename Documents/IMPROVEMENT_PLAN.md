@@ -132,10 +132,60 @@ Give each agent one lane. Tasks inside a lane run one after another.
 
 > Read `Documents/IMPROVEMENT_PLAN.md`. Do task `<ID>` only. Follow section 2. Report what changed, the output of the checks, what you could not verify, and any decision you need.
 
-## 6. Decisions for the owner
+## 6. Owner decisions (recorded 2026-11-27)
 
-1. Remove `ai-smart-buddy/`? (F3)
-2. Build or remove Recent Activity? (E1)
-3. Drop the priority-scoring claim, or build it? (E2)
-4. Where will frontend and backend be hosted? (affects B4)
-5. Which Phase 4 features do you want?
+| Topic | Decision |
+|---|---|
+| `ai-smart-buddy/` | Delete (part of F3) |
+| Recent Activity (E1) | Build it |
+| Priority scoring (E2) | Build it, so the landing page claim becomes true |
+| Hosting | Free tiers: frontend on Vercel, backend on Render, database on Supabase |
+
+### E1 design: activity log
+New table `activity_log (id, student_id, type, title, entity_id, created_at)`, written by the backend when a task, notice, quiz, deck or board is created or completed. `GET /api/activity/recent` returns the latest 20. The existing widget reads it. Remove the unused `automation_logs` use.
+
+### E2 design: priority score
+Computed by plain rules, not an AI call (free, instant, testable): days left, overdue, status and an optional user-set importance. Show High / Medium / Low with the reason, and allow sorting by it. Landing copy says "ranks by urgency and importance", without claiming AI.
+
+### Free-tier constraints
+Limits change; check each provider before relying on them.
+- Render free web services sleep when idle: first request is slow, and in-process cron is unreliable. Run scheduled jobs from a GitHub Actions schedule calling a secret-protected endpoint.
+- Render's disk is temporary: no file storage (B6).
+- Supabase free projects pause after a period of inactivity and have small storage: compress or limit uploads.
+- Proxy `/api` through Vercel rewrites so the browser sees one origin; this makes B4 (httpOnly cookie) simple.
+- Resend needs a verified domain to email other people.
+
+New task **D1** (P0, M): deployment setup (`vercel.json`, `render.yaml`, env checklist, keep-alive decision).
+
+## 7. Features adopted from the Proddy review
+
+Ideas only, rebuilt for Quill's stack. Proddy runs on Convex and paid services, so its code does not carry over.
+
+| ID | Feature | Free-tier fit | Done when | Depends on | P | Size |
+|---|---|---|---|---|---|---|
+| P1 | Kanban board view for tasks (drag between To do / In progress / Done) | Yes | Works by mouse, touch and keyboard | E5 | P1 | M |
+| P2 | Calendar page: month and week view of tasks and notices | Yes | Click a day to add a task | E5 | P1 | M |
+| P3 | Notes editor with AI summarize, expand and "turn into tasks" (covers N4) | Yes, within AI limits | Notes feed flashcards and quizzes | B9 | P1 | L |
+| P4 | Command palette and global search, Ctrl+K (covers N6) | Yes | Jumps to any page or item | U2 | P1 | M |
+| P5 | Daily recap on the dashboard: due, overdue, attendance risk | Yes | Built from real data | E1 | P1 | S |
+| P6 | Weekly email digest with unsubscribe | Yes, scheduled by GitHub Actions | Sends once, can be turned off | N1, D1 | P2 | M |
+| P7 | Reports page: completion, focus time, quiz scores, attendance trend (covers N7) | Yes | Charts from real data | E1 | P2 | M |
+| P8 | Workload indicator: warns when many deadlines cluster | Yes, rule-based | Shown on dashboard and calendar | E2 | P2 | S |
+| P9 | Email code verification at signup and password strength meter | Needs Resend domain | Unverified accounts are limited | Resend | P1 | M |
+| P10 | Read-only share link for a note or flashcard deck, revocable | Yes | Link can be disabled | P3 | P2 | M |
+| P11 | Installable app with offline page (covers N5) | Yes | Installs on a phone | U7 | P2 | M |
+| P12 | Study assistant that can create tasks and decks from chat, with confirmation | Yes, within AI limits | Nothing is created without a click | E8, B9 | P2 | L |
+
+**Left out:** team messaging, channels, voice or video meetings, meeting transcription, live cursors, sprints and roadmaps, Slack/Linear/Todoist imports, billing, third-party chat and tracking widgets. They serve teams rather than a single student, or depend on paid or OAuth services.
+
+## 8. Build order
+
+1. **Foundation:** F1, F2, F3, B1, B2, B3, D1
+2. **Promised features:** E1, E2, E5, E10
+3. **Study:** E3, E4, E8, B9, P3
+4. **Planning:** P1, P2, P4, P5, P8
+5. **Later:** N1, P6, P7, P9, P10, P11, P12, E6, E7, E9, E11, E12, then U1-U9
+
+Stop after each step for the owner to try it.
+
+> Update: the owner later asked for the team features listed as "Left out" in section 7. See `Documents/COLLAB_PLAN.md`, which replaces that exclusion (billing stays excluded).
