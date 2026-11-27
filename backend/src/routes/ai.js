@@ -3,6 +3,7 @@ const multer = require("multer");
 const authMiddleware = require("../middleware/auth");
 const validate = require("../middleware/validate");
 const { aiLimiter } = require("../middleware/rateLimit");
+const { aiQuota, refundAiQuota } = require("../middleware/aiQuota");
 const {
   attendanceAlertSchema,
   chatSchema,
@@ -33,9 +34,10 @@ function uploadDocument(req, res, next) {
   });
 }
 
-router.post("/parse-document", authMiddleware, aiLimiter, uploadDocument, async (req, res) => {
+router.post("/parse-document", authMiddleware, aiLimiter, uploadDocument, aiQuota, async (req, res) => {
   try {
     if (!req.file) {
+      await refundAiQuota(req.student.id);
       return res.status(400).json({ message: "No document provided" });
     }
 
@@ -68,12 +70,17 @@ router.post("/parse-document", authMiddleware, aiLimiter, uploadDocument, async 
     } else if (['txt', 'md', 'csv', 'json'].includes(extension)) {
       text = file.buffer.toString('utf-8');
     } else {
+      await refundAiQuota(req.student.id);
       return res.status(400).json({ message: "Unsupported file type. Please upload a PDF or text file." });
     }
     
     res.json({ text });
   } catch (error) {
     console.error("Document parse error:", error);
+    if (req.aiQuotaCharged && req.student?.id) {
+      req.aiQuotaCharged = false;
+      await refundAiQuota(req.student.id);
+    }
     res.status(422).json({ message: "Failed to parse document. The file may be damaged." });
   }
 });
@@ -88,7 +95,7 @@ router.get("/tip", async (req, res) => {
   }
 });
 
-router.post("/attendance-alert", authMiddleware, aiLimiter, validate({ body: attendanceAlertSchema }), async (req, res, next) => {
+router.post("/attendance-alert", authMiddleware, aiLimiter, validate({ body: attendanceAlertSchema }), aiQuota, async (req, res, next) => {
   try {
     const { subject, total, attended, threshold } = req.body;
     const result = await attendanceAlert(subject, total, attended, threshold);
@@ -98,7 +105,7 @@ router.post("/attendance-alert", authMiddleware, aiLimiter, validate({ body: att
   }
 });
 
-router.post("/chat", authMiddleware, aiLimiter, validate({ body: chatSchema }), async (req, res, next) => {
+router.post("/chat", authMiddleware, aiLimiter, validate({ body: chatSchema }), aiQuota, async (req, res, next) => {
   try {
     const { messages } = req.body;
     const reply = await chatResponse(messages);
@@ -108,7 +115,7 @@ router.post("/chat", authMiddleware, aiLimiter, validate({ body: chatSchema }), 
   }
 });
 
-router.post("/flashcards", authMiddleware, aiLimiter, validate({ body: notesSchema }), async (req, res, next) => {
+router.post("/flashcards", authMiddleware, aiLimiter, validate({ body: notesSchema }), aiQuota, async (req, res, next) => {
   try {
     const { notes } = req.body;
     const flashcards = await generateFlashcards(notes);
@@ -118,7 +125,7 @@ router.post("/flashcards", authMiddleware, aiLimiter, validate({ body: notesSche
   }
 });
 
-router.post("/quiz", authMiddleware, aiLimiter, validate({ body: quizGenerateSchema }), async (req, res, next) => {
+router.post("/quiz", authMiddleware, aiLimiter, validate({ body: quizGenerateSchema }), aiQuota, async (req, res, next) => {
   try {
     const { notes, count, type } = req.body;
     const questions = await generateQuiz(notes, count, type || "mcq");
@@ -128,7 +135,7 @@ router.post("/quiz", authMiddleware, aiLimiter, validate({ body: quizGenerateSch
   }
 });
 
-router.post("/grade-short-answer", authMiddleware, aiLimiter, validate({ body: gradeShortAnswerSchema }), async (req, res, next) => {
+router.post("/grade-short-answer", authMiddleware, aiLimiter, validate({ body: gradeShortAnswerSchema }), aiQuota, async (req, res, next) => {
   try {
     const { question, modelAnswer, userAnswer } = req.body;
     const result = await gradeShortAnswer(question, modelAnswer, userAnswer);
@@ -138,11 +145,15 @@ router.post("/grade-short-answer", authMiddleware, aiLimiter, validate({ body: g
   }
 });
 
-router.post("/tool/:toolSlug", authMiddleware, aiLimiter, validate({ params: toolParamsSchema, body: toolBodySchema }), async (req, res, next) => {
+router.post("/tool/:toolSlug", authMiddleware, aiLimiter, validate({ params: toolParamsSchema, body: toolBodySchema }), aiQuota, async (req, res, next) => {
   try {
     const { toolSlug } = req.params;
     const { content, options } = req.body;
     if (!content && toolSlug !== 'study-schedule') {
+      if (req.aiQuotaCharged && req.student?.id) {
+        req.aiQuotaCharged = false;
+        await refundAiQuota(req.student.id);
+      }
       return res.status(400).json({ message: "content: Content input is required" });
     }
     const result = await executeSmartTool(toolSlug, content, options);
@@ -150,6 +161,14 @@ router.post("/tool/:toolSlug", authMiddleware, aiLimiter, validate({ params: too
   } catch (error) {
     next(error);
   }
+});
+
+router.use(async (err, req, res, next) => {
+  if (req.aiQuotaCharged && req.student?.id) {
+    req.aiQuotaCharged = false;
+    await refundAiQuota(req.student.id);
+  }
+  next(err);
 });
 
 module.exports = router;

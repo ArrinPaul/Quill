@@ -1,6 +1,16 @@
 const Groq = require("groq-sdk");
+const {
+  flashcardsOutputSchema,
+  getQuizOutputSchema,
+  gradeShortAnswerOutputSchema,
+} = require("../schemas/ai");
+
+const DEFAULT_TIMEOUT_MS = 30_000;
 
 let groq = null;
+let customCompleter = null;
+let aiTimeoutMs = DEFAULT_TIMEOUT_MS;
+
 try {
   const key = process.env.GROQ_API_KEY;
   if (key && key !== "placeholder") {
@@ -15,6 +25,18 @@ function isGroqAvailable() {
   return groq !== null;
 }
 
+function setGroqClient(client) {
+  groq = client;
+}
+
+function setCompleter(fn) {
+  customCompleter = fn || null;
+}
+
+function setAiTimeoutMs(ms) {
+  aiTimeoutMs = Number.isFinite(ms) && ms > 0 ? ms : DEFAULT_TIMEOUT_MS;
+}
+
 // Raised when the AI provider is missing or fails, so callers never present made-up output as real.
 class AIError extends Error {
   constructor(message = "The AI service is unavailable right now. Please try again later.") {
@@ -24,15 +46,41 @@ class AIError extends Error {
 }
 
 async function complete(params) {
-  if (!isGroqAvailable()) throw new AIError("AI is not configured on the server.");
+  if (!customCompleter && !isGroqAvailable()) {
+    throw new AIError("AI is not configured on the server.");
+  }
+
+  const controller = new AbortController();
+  let timer;
+  const timeoutPromise = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new AIError("The AI request timed out. Please try again."));
+    }, aiTimeoutMs);
+  });
+
   try {
-    const res = await groq.chat.completions.create({ model: "groq/compound", ...params });
-    const text = res.choices[0]?.message?.content;
-    if (!text) throw new Error("Empty AI response");
+    const work = customCompleter
+      ? Promise.resolve(customCompleter(params, { signal: controller.signal }))
+      : groq.chat.completions
+          .create({ model: "groq/compound", ...params }, { signal: controller.signal })
+          .then((res) => {
+            const text = res.choices[0]?.message?.content;
+            if (!text) throw new Error("Empty AI response");
+            return text;
+          });
+
+    const text = await Promise.race([work, timeoutPromise]);
+    if (!text || typeof text !== "string") {
+      throw new Error("Empty AI response");
+    }
     return text;
   } catch (err) {
+    if (err instanceof AIError) throw err;
     console.error("Groq request failed:", err.message);
     throw new AIError();
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -42,6 +90,15 @@ function parseJson(text) {
   } catch {
     throw new AIError("The AI returned an unreadable response. Please try again.");
   }
+}
+
+function parseAndValidateJson(text, schema) {
+  const parsed = parseJson(text);
+  const result = schema.safeParse(parsed);
+  if (!result.success) {
+    throw new AIError("The AI returned an unexpected response format. Please try again.");
+  }
+  return result.data;
 }
 
 // Returns null when no summary could be made; the notice is still worth saving.
@@ -123,7 +180,7 @@ Format: [{"front": "question", "back": "answer", "citation": "quote from notes"}
     temperature: 0.7,
     max_tokens: 2048,
   });
-  return parseJson(text);
+  return parseAndValidateJson(text, flashcardsOutputSchema);
 }
 
 async function generateQuiz(notes, count = 10, type = "mcq") {
@@ -173,7 +230,7 @@ Format: [{"question": "...", "options": ["A", "B", "C", "D"], "correctIndex": 0,
     temperature: 0.7,
     max_tokens: 2048,
   });
-  return parseJson(text);
+  return parseAndValidateJson(text, getQuizOutputSchema(type));
 }
 
 async function gradeShortAnswer(question, modelAnswer, userAnswer) {
@@ -191,7 +248,7 @@ Do not include any markdown, backticks, or explanation text outside the JSON obj
     temperature: 0.3,
     max_tokens: 512,
   });
-  return parseJson(text);
+  return parseAndValidateJson(text, gradeShortAnswerOutputSchema);
 }
 
 async function executeSmartTool(tool, content, options = {}) {
@@ -425,6 +482,11 @@ Do NOT wrap the JSON in Markdown backticks (e.g., \`\`\`json). Return raw JSON.`
 }
 
 module.exports = {
+  AIError,
+  setGroqClient,
+  setCompleter,
+  setAiTimeoutMs,
+  complete,
   summarizeNotice,
   getStudyTip,
   attendanceAlert,
