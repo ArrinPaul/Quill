@@ -13,11 +13,59 @@ router.post("/fan-out", (req, res) => {
 });
 
 // Calendar apps can't send auth headers, so the feed URL carries a per-student signature.
-const feedToken = (studentId) =>
-  crypto.createHmac("sha256", process.env.JWT_SECRET).update(`calendar-feed:${studentId}`).digest("hex");
+const feedToken = (studentId, feedVersion) => {
+  const version = feedVersion ?? 0;
+  return crypto
+    .createHmac("sha256", process.env.JWT_SECRET)
+    .update(`calendar-feed:${studentId}:${version}`)
+    .digest("hex");
+};
 
-router.get("/feed-url", authMiddleware, (req, res) => {
-  res.json({ path: `/api/calendar/feed/${req.student.id}?token=${feedToken(req.student.id)}` });
+const feedPath = (studentId, feedVersion) =>
+  `/api/calendar/feed/${studentId}?token=${feedToken(studentId, feedVersion)}`;
+
+router.get("/feed-url", authMiddleware, async (req, res, next) => {
+  try {
+    const supabase = getClient();
+    const { data: student, error } = await supabase
+      .from("students")
+      .select("id, feed_version")
+      .eq("id", req.student.id)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!student) return res.status(404).json({ message: "Student not found" });
+
+    res.json({ path: feedPath(req.student.id, student.feed_version) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/feed-reset", authMiddleware, async (req, res, next) => {
+  try {
+    const supabase = getClient();
+    const { data: student, error: fetchError } = await supabase
+      .from("students")
+      .select("id, feed_version")
+      .eq("id", req.student.id)
+      .maybeSingle();
+
+    if (fetchError) throw fetchError;
+    if (!student) return res.status(404).json({ message: "Student not found" });
+
+    const nextVersion = (student.feed_version ?? 0) + 1;
+    const { error: updateError } = await supabase
+      .from("students")
+      .update({ feed_version: nextVersion })
+      .eq("id", req.student.id);
+
+    if (updateError) throw updateError;
+
+    res.json({ path: feedPath(req.student.id, nextVersion) });
+  } catch (error) {
+    next(error);
+  }
 });
 
 const escapeIcs = (value) =>
@@ -38,12 +86,23 @@ function formatIcsDate(dateString) {
 router.get("/feed/:student_id", validate({ params: studentIdParamSchema }), async (req, res, next) => {
   try {
     const { student_id } = req.params;
+    const supabase = getClient();
+    const { data: student, error: studentError } = await supabase
+      .from("students")
+      .select("id, feed_version")
+      .eq("id", student_id)
+      .maybeSingle();
+
+    if (studentError) throw studentError;
+    if (!student) {
+      return res.status(401).send("Invalid calendar feed link");
+    }
+
     const given = Buffer.from(String(req.query.token || ""));
-    const expected = Buffer.from(feedToken(student_id));
+    const expected = Buffer.from(feedToken(student_id, student.feed_version));
     if (given.length !== expected.length || !crypto.timingSafeEqual(given, expected)) {
       return res.status(401).send("Invalid calendar feed link");
     }
-    const supabase = getClient();
 
     // Fetch personal tasks
     const { data: tasks, error: tasksError } = await supabase

@@ -74,4 +74,32 @@ describe("Calendar feed signature", () => {
     const crossUser = await ctx.request("GET", `/api/calendar/feed/${userB.student.id}?token=${tokenA}`);
     assert.equal(crossUser.status, 401);
   });
+
+  it("rejects unauthenticated POST /api/calendar/feed-reset with 401", async () => {
+    const res = await ctx.request("POST", "/api/calendar/feed-reset");
+    assert.equal(res.status, 401);
+  });
+
+  it("resets feed_version on POST /api/calendar/feed-reset and invalidates old feed links", async () => {
+    const initialRes = await ctx.request("GET", "/api/calendar/feed-url", { token: userA.token });
+    assert.equal(initialRes.status, 200);
+    const oldPath = initialRes.data.path;
+
+    const resetRes = await ctx.request("POST", "/api/calendar/feed-reset", { token: userA.token });
+    assert.equal(resetRes.status, 200);
+    const newPath = resetRes.data.path;
+    assert.ok(newPath.startsWith(`/api/calendar/feed/${userA.student.id}?token=`));
+    assert.notEqual(newPath, oldPath);
+
+    const oldFeed = await ctx.request("GET", oldPath);
+    assert.equal(oldFeed.status, 401);
+
+    const newFeed = await ctx.request("GET", newPath);
+    assert.equal(newFeed.status, 200);
+    assert.match(newFeed.text, /BEGIN:VCALENDAR/);
+
+    const currentRes = await ctx.request("GET", "/api/calendar/feed-url", { token: userA.token });
+    assert.equal(currentRes.status, 200);
+    assert.equal(currentRes.data.path, newPath);
+  });
 });

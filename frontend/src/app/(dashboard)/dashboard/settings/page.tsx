@@ -3,8 +3,8 @@ import { useEscape } from "@/hooks/useEscape";
 import { toast } from 'sonner';
 
 import { useEffect, useState } from "react";
-import { Key01 as Key, Loading01 as Loader2, Plus, Save01 as Save, Settings01 as Settings, Shield02 as ShieldAlert, ShieldTick as ShieldCheck, Stars01 as Sparkles, User01 as User, XClose as X } from "@untitledui/icons";
-import { api } from "@/lib/api";
+import { AlertTriangle, Calendar, Check, Copy01 as Copy, Key01 as Key, Loading01 as Loader2, Plus, RefreshCcw01 as RefreshCw, Save01 as Save, Settings01 as Settings, User01 as User, XClose as X } from "@untitledui/icons";
+import { API_BASE, api } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 
@@ -37,6 +37,20 @@ export default function SettingsPage() {
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
 
+  // Calendar feed states
+  const [feedUrl, setFeedUrl] = useState("");
+  const [feedLoading, setFeedLoading] = useState(true);
+  const [feedError, setFeedError] = useState("");
+  const [copiedFeed, setCopiedFeed] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [resettingFeed, setResettingFeed] = useState(false);
+  useEscape(showResetConfirm && !resettingFeed, () => setShowResetConfirm(false));
+
+  const buildFeedUrl = (path: string) => {
+    const base = API_BASE || (typeof window !== "undefined" ? window.location.origin : "");
+    return `${base}${path}`;
+  };
+
   useEffect(() => {
     if (user) {
       setName(user.name || "");
@@ -46,6 +60,67 @@ export default function SettingsPage() {
       setLoading(false);
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    let active = true;
+    api
+      .get<{ path: string }>("/api/calendar/feed-url")
+      .then((res) => {
+        if (!active) return;
+        setFeedUrl(buildFeedUrl(res.path));
+        setFeedError("");
+        setFeedLoading(false);
+      })
+      .catch((err) => {
+        if (!active) return;
+        setFeedError(err instanceof Error ? err.message : "Failed to load calendar link");
+        setFeedLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [user]);
+
+  const handleRetryFeedUrl = async () => {
+    setFeedLoading(true);
+    setFeedError("");
+    try {
+      const res = await api.get<{ path: string }>("/api/calendar/feed-url");
+      setFeedUrl(buildFeedUrl(res.path));
+    } catch (err) {
+      setFeedError(err instanceof Error ? err.message : "Failed to load calendar link");
+    } finally {
+      setFeedLoading(false);
+    }
+  };
+
+  const handleCopyFeedUrl = async () => {
+    if (!feedUrl) return;
+    try {
+      await navigator.clipboard.writeText(feedUrl);
+      setCopiedFeed(true);
+      toast.success("Calendar link copied to clipboard");
+      setTimeout(() => setCopiedFeed(false), 2000);
+    } catch {
+      toast.error("Could not copy link. Please copy it manually.");
+    }
+  };
+
+  const handleResetFeedUrl = async () => {
+    setResettingFeed(true);
+    try {
+      const res = await api.post<{ path: string }>("/api/calendar/feed-reset");
+      setFeedUrl(buildFeedUrl(res.path));
+      setCopiedFeed(false);
+      setShowResetConfirm(false);
+      toast.success("Calendar link reset. Previous links are now revoked.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to reset calendar link");
+    } finally {
+      setResettingFeed(false);
+    }
+  };
 
   const handleAddSubject = (e: React.FormEvent) => {
     e.preventDefault();
@@ -394,6 +469,98 @@ export default function SettingsPage() {
             </form>
           </div>
 
+          {/* Calendar Feed Card */}
+          <div className="bg-card border border-border rounded-[10px] p-6 shadow-sm space-y-4">
+            <h3 className="font-semibold text-foreground text-base flex items-center gap-2 border-b border-border pb-3">
+              <Calendar className="w-4 h-4 text-primary" />
+              Calendar feed
+            </h3>
+
+            <p className="text-sm text-muted-foreground">
+              Subscribe to your tasks and class events in Google Calendar, Apple Calendar, or Outlook using this private .ics link.
+            </p>
+
+            <div className="flex items-start gap-2.5 p-3 rounded-[10px] bg-amber-500/10 border border-amber-500/20 text-xs text-foreground">
+              <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+              <p>
+                Anyone with this link can read your tasks. Reset the link if you ever share it by mistake.
+              </p>
+            </div>
+
+            {feedLoading ? (
+              <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                Loading calendar link...
+              </div>
+            ) : feedError ? (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-[10px] bg-destructive/10 border border-destructive/20 text-sm text-destructive">
+                <span>{feedError}</span>
+                <button
+                  type="button"
+                  onClick={handleRetryFeedUrl}
+                  className="shrink-0 px-3 py-1.5 rounded-[10px] border border-border bg-card text-foreground text-xs font-medium hover:bg-muted transition-standard cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  Retry
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={feedUrl}
+                    aria-label="Calendar feed URL"
+                    onClick={(e) => e.currentTarget.select()}
+                    className="w-full min-w-0 flex-1 px-3 py-2 border border-border rounded-[10px] text-xs bg-muted text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={handleCopyFeedUrl}
+                      className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-primary text-primary-foreground text-xs font-semibold rounded-[10px] hover:opacity-90 transition-standard cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring"
+                    >
+                      {copiedFeed ? (
+                        <>
+                          <Check className="w-3.5 h-3.5" />
+                          Copied
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" />
+                          Copy calendar link
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowResetConfirm(true)}
+                      className="inline-flex items-center justify-center gap-1.5 px-3 py-2 border border-border bg-card text-foreground text-xs font-medium rounded-[10px] hover:bg-muted transition-standard cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      Reset link
+                    </button>
+                  </div>
+                </div>
+
+                <div className="rounded-[10px] border border-border bg-muted/40 p-3 space-y-1.5 text-xs text-muted-foreground">
+                  <p className="font-semibold text-foreground">How to subscribe</p>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>
+                      <span className="font-medium text-foreground">Google Calendar:</span> Other calendars (+) → From URL → paste the link.
+                    </li>
+                    <li>
+                      <span className="font-medium text-foreground">Apple Calendar:</span> File → New Calendar Subscription → paste the link.
+                    </li>
+                    <li>
+                      <span className="font-medium text-foreground">Outlook:</span> Add calendar → Subscribe from web → paste the link.
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Danger Zone */}
           <div className="bg-red-50 border border-red-200 rounded-[10px] p-6 shadow-sm space-y-4">
             <h3 className="font-semibold text-red-700 text-base flex items-center gap-2 border-b border-red-200 pb-3">
@@ -417,6 +584,46 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
+
+      {showResetConfirm && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="reset-feed-title"
+          className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200"
+          onClick={() => !resettingFeed && setShowResetConfirm(false)}
+        >
+          <div
+            className="bg-card rounded-[12px] border border-border shadow-2xl max-w-md w-full p-6 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="reset-feed-title" className="text-lg font-bold text-foreground">
+              Reset Calendar Link?
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              This will generate a new calendar feed URL and immediately revoke your old link. Any calendar app using the old link will stop syncing until you update it.
+            </p>
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                disabled={resettingFeed}
+                onClick={() => setShowResetConfirm(false)}
+                className="px-4 py-2 border border-border rounded-[10px] text-sm font-medium text-muted-foreground hover:bg-muted transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={resettingFeed}
+                onClick={handleResetFeedUrl}
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-[10px] text-sm font-semibold hover:opacity-90 transition-colors cursor-pointer disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                {resettingFeed ? "Resetting..." : "Yes, Reset Link"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showDeleteConfirm && (
         <div role="dialog" aria-modal="true"
