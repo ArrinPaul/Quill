@@ -18,6 +18,14 @@ const { isEmailConfigured, sendPasswordReset } = require("../services/email");
 
 const router = express.Router();
 
+function signSessionToken(student, tokenVersion = student.token_version ?? 0) {
+  return jwt.sign(
+    { id: student.id, email: student.email, tv: tokenVersion },
+    process.env.JWT_SECRET,
+    { expiresIn: "7d" }
+  );
+}
+
 router.post("/check-email", authIpLimiter, validate({ body: checkEmailSchema }), async (req, res, next) => {
   try {
     const { email } = req.body;
@@ -71,11 +79,7 @@ router.post("/register", authIpLimiter, validate({ body: registerSchema }), asyn
 
     if (error) throw error;
 
-    const token = jwt.sign(
-      { id: student.id, email: student.email },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    const token = signSessionToken(student);
 
     res.json({ token, student });
   } catch (error) {
@@ -102,11 +106,7 @@ router.post("/login", authIpLimiter, loginEmailLimiter, validate({ body: loginSc
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    const token = jwt.sign(
-      { id: student.id, email: student.email },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    const token = signSessionToken(student);
 
     const { password_hash, ...studentData } = student;
     res.json({ token, student: studentData });
@@ -162,7 +162,7 @@ router.put("/password", authMiddleware, validate({ body: changePasswordSchema })
     const supabase = getClient();
     const { data: student, error: fetchError } = await supabase
       .from("students")
-      .select("id, password_hash")
+      .select("id, email, password_hash, token_version")
       .eq("id", req.student.id)
       .single();
 
@@ -176,13 +176,15 @@ router.put("/password", authMiddleware, validate({ body: changePasswordSchema })
     }
 
     const password_hash = await bcrypt.hash(newPassword, 10);
+    const nextTokenVersion = (student.token_version ?? 0) + 1;
     const { error: updateError } = await supabase
       .from("students")
-      .update({ password_hash })
+      .update({ password_hash, token_version: nextTokenVersion })
       .eq("id", req.student.id);
 
     if (updateError) throw updateError;
-    res.json({ message: "Password updated successfully" });
+    const token = signSessionToken(student, nextTokenVersion);
+    res.json({ message: "Password updated successfully", token });
   } catch (error) {
     next(error);
   }
@@ -251,7 +253,7 @@ router.post("/reset-password", authIpLimiter, validate({ body: resetPasswordSche
     const supabase = getClient();
     const { data: student, error: fetchError } = await supabase
       .from("students")
-      .select("id, password_hash")
+      .select("id, password_hash, token_version")
       .eq("id", decoded.id)
       .single();
 
@@ -260,9 +262,10 @@ router.post("/reset-password", authIpLimiter, validate({ body: resetPasswordSche
     }
 
     const password_hash = await bcrypt.hash(newPassword, 10);
+    const nextTokenVersion = (student.token_version ?? 0) + 1;
     const { error: updateError } = await supabase
       .from("students")
-      .update({ password_hash })
+      .update({ password_hash, token_version: nextTokenVersion })
       .eq("id", student.id);
 
     if (updateError) throw updateError;

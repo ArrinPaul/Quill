@@ -33,6 +33,12 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
   }
 
   if (!res.ok) {
+    if (res.status === 401 && headers["Authorization"] && typeof window !== "undefined") {
+      localStorage.removeItem("Quill_token");
+      if (window.location.pathname !== "/login") {
+        window.location.href = "/login";
+      }
+    }
     const fallback =
       res.status === 429
         ? "Too many attempts. Please try again later."

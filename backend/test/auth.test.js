@@ -102,4 +102,82 @@ describe("Auth routes", () => {
     const res = await ctx.request("GET", "/api/auth/me");
     assert.equal(res.status, 401);
   });
+
+  it("revokes old and legacy tokens on password change and returns a working fresh token", async () => {
+    const dave = await ctx.registerStudent({ email: "dave-pw-change@example.com" });
+    assert.equal(jwt.decode(dave.token).tv, 0);
+
+    const legacyToken = jwt.sign(
+      { id: dave.student.id, email: dave.student.email },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" }
+    );
+
+    const legacyBefore = await ctx.request("GET", "/api/auth/me", { token: legacyToken });
+    assert.equal(legacyBefore.status, 200);
+
+    const changeRes = await ctx.request("PUT", "/api/auth/password", {
+      token: dave.token,
+      body: {
+        currentPassword: dave.password,
+        newPassword: "newpassword123",
+      },
+    });
+    assert.equal(changeRes.status, 200);
+    assert.ok(changeRes.data.token);
+    assert.equal(jwt.decode(changeRes.data.token).tv, 1);
+
+    const oldAfter = await ctx.request("GET", "/api/auth/me", { token: dave.token });
+    assert.equal(oldAfter.status, 401);
+
+    const legacyAfter = await ctx.request("GET", "/api/auth/me", { token: legacyToken });
+    assert.equal(legacyAfter.status, 401);
+
+    const freshAfter = await ctx.request("GET", "/api/auth/me", { token: changeRes.data.token });
+    assert.equal(freshAfter.status, 200);
+  });
+
+  it("revokes old tokens on password reset", async () => {
+    const eve = await ctx.registerStudent({ email: "eve-pw-reset@example.com" });
+
+    const { data: studentRow } = await ctx.db
+      .from("students")
+      .select("id, email, password_hash")
+      .eq("id", eve.student.id)
+      .single();
+
+    const resetToken = jwt.sign(
+      {
+        id: studentRow.id,
+        email: studentRow.email,
+        purpose: "password_reset",
+        fp: studentRow.password_hash.slice(-10),
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "15m" }
+    );
+
+    const resetRes = await ctx.request("POST", "/api/auth/reset-password", {
+      body: {
+        token: resetToken,
+        newPassword: "resetpassword123",
+      },
+    });
+    assert.equal(resetRes.status, 200);
+
+    const oldAfterReset = await ctx.request("GET", "/api/auth/me", { token: eve.token });
+    assert.equal(oldAfterReset.status, 401);
+
+    const loginRes = await ctx.request("POST", "/api/auth/login", {
+      body: {
+        email: eve.student.email,
+        password: "resetpassword123",
+      },
+    });
+    assert.equal(loginRes.status, 200);
+    assert.equal(jwt.decode(loginRes.data.token).tv, 1);
+
+    const freshMe = await ctx.request("GET", "/api/auth/me", { token: loginRes.data.token });
+    assert.equal(freshMe.status, 200);
+  });
 });
