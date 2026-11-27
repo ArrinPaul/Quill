@@ -4,6 +4,7 @@ const authMiddleware = require("../middleware/auth");
 const validate = require("../middleware/validate");
 const { idParamSchema } = require("../schemas/common");
 const { createWhiteboardSchema, updateWhiteboardSchema } = require("../schemas/whiteboards");
+const { logActivity } = require("../services/activity");
 
 const router = express.Router();
 router.use(authMiddleware);
@@ -60,6 +61,7 @@ router.post("/", validate({ body: createWhiteboardSchema }), async (req, res, ne
       .single();
 
     if (error) throw error;
+    await logActivity(req.student.id, "board_created", whiteboard.title, whiteboard.id);
     res.json({ whiteboard });
   } catch (error) {
     next(error);

@@ -146,7 +146,7 @@ export default function DashboardPage() {
   };
 
   const totalCount = tasks.length;
-  const pendingCount = tasks.filter((t) => t.status === "pending").length;
+  const pendingCount = tasks.filter((t) => t.status === "pending" || t.status === "in_progress").length;
   const completedCount = tasks.filter((t) => t.status === "completed").length;
 
   return (

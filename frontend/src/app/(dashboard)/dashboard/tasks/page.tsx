@@ -1,18 +1,23 @@
 "use client";
 
 import { useEscape } from "@/hooks/useEscape";
-import { useEffect, useState } from "react";
-import { ArrowLeft, Bell01 as Bell, Calendar, Check, Edit01 as Edit2, List as ListTodo, Loading01 as Loader2, Plus, Trash01 as Trash2, XClose as X } from "@untitledui/icons";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Bell01 as Bell, Calendar, Check, Edit01 as Edit2, List as ListTodo, Loading01 as Loader2, Plus, Repeat01 as Repeat, SearchMd as Search, Trash01 as Trash2, XClose as X } from "@untitledui/icons";
 import { api } from "@/lib/api";
 import { daysUntil } from "@/lib/utils";
 import { motion } from "framer-motion";
-import type { Task, TaskStatus } from "@/features/types";
+import type { Task, TaskFilter, TaskImportance, TaskRepeat, TaskStatus } from "@/features/types";
 import { generateGoogleCalendarUrl } from "@/lib/calendar";
+import { sortTasksByPriority } from "@/lib/priority";
+import { PriorityBadge } from "@/features/tasks/components/PriorityBadge";
+import { usePrioritySort } from "@/features/tasks/hooks/usePrioritySort";
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeFilter, setActiveFilter] = useState<"today" | "upcoming" | "completed" | "all">("today");
+  const [activeFilter, setActiveFilter] = useState<TaskFilter>("today");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedSubject, setSelectedSubject] = useState("all");
   
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -26,7 +31,14 @@ export default function TasksPage() {
   const [description, setDescription] = useState("");
   const [deadline, setDeadline] = useState("");
   const [reminderTime, setReminderTime] = useState("");
+  const [importance, setImportance] = useState<TaskImportance>("normal");
   const [status, setStatus] = useState<TaskStatus>("pending");
+  const [repeat, setRepeat] = useState<TaskRepeat>("none");
+  const { sortByPriority, toggleSortByPriority } = usePrioritySort("quill.tasks.sortByPriority");
+
+  // Undo delete state
+  const [undoToast, setUndoToast] = useState<{ taskId: string; title: string } | null>(null);
+  const pendingDeletesRef = useRef<Map<string, { task: Task; timerId: ReturnType<typeof setTimeout> }>>(new Map());
   
   const [formError, setFormError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -48,6 +60,26 @@ export default function TasksPage() {
     fetchTasks();
   }, []);
 
+  const flushPendingDeletes = useCallback(() => {
+    const entries = Array.from(pendingDeletesRef.current.entries());
+    if (entries.length === 0) return;
+    pendingDeletesRef.current.clear();
+    for (const [id, entry] of entries) {
+      clearTimeout(entry.timerId);
+      void api.delete(`/api/tasks/${id}`).catch((err) => {
+        console.error("Failed to flush task delete", err);
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener("pagehide", flushPendingDeletes);
+    return () => {
+      window.removeEventListener("pagehide", flushPendingDeletes);
+      flushPendingDeletes();
+    };
+  }, [flushPendingDeletes]);
+
   const dayBefore = (value: string) => {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return "";
@@ -62,26 +94,51 @@ export default function TasksPage() {
     if (isAutomatic || reminderIsLate) setReminderTime(dayBefore(value));
   };
 
+  const subjects = useMemo(
+    () =>
+      Array.from(new Set(tasks.map((t) => t.subject).filter(Boolean))).sort((a, b) =>
+        a.localeCompare(b)
+      ),
+    [tasks]
+  );
+
   // Filters logic
   const filteredTasks = tasks.filter((task) => {
-    if (activeFilter === "completed") return task.status === "completed";
-    if ((task.status === "completed" || task.status === "cancelled") && activeFilter !== "all") return false; // hide completed in other lists
-    
-    const taskDate = new Date(task.deadline);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    if (activeFilter === "today") {
-      return taskDate >= today && taskDate < tomorrow;
-    }
-    if (activeFilter === "upcoming") {
+    if (activeFilter === "in_progress") {
+      if (task.status !== "in_progress") return false;
+    } else if (activeFilter === "completed") {
+      if (task.status !== "completed") return false;
+    } else if ((task.status === "completed" || task.status === "cancelled") && activeFilter !== "all") {
+      return false; // hide completed in other lists
+    } else if (activeFilter === "today") {
+      const taskDate = new Date(task.deadline);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      if (taskDate < today || taskDate >= tomorrow) return false;
+    } else if (activeFilter === "upcoming") {
       const days = daysUntil(task.deadline);
-      return days >= 0 && days <= 7;
+      if (days < 0 || days > 7) return false;
     }
+
+    if (selectedSubject !== "all" && task.subject !== selectedSubject) {
+      return false;
+    }
+
+    const q = searchQuery.trim().toLowerCase();
+    if (q && !task.title.toLowerCase().includes(q) && !task.subject.toLowerCase().includes(q)) {
+      return false;
+    }
+
     return true;
   });
+
+  const displayedTasks = sortByPriority
+    ? sortTasksByPriority(filteredTasks)
+    : [...filteredTasks].sort(
+        (a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
+      );
 
   const handleOpenCreateModal = () => {
     setIsEditing(false);
@@ -91,7 +148,9 @@ export default function TasksPage() {
     setDescription("");
     setDeadline("");
     setReminderTime("");
+    setImportance("normal");
     setStatus("pending");
+    setRepeat("none");
     setFormError("");
     setIsModalOpen(true);
   };
@@ -117,7 +176,9 @@ export default function TasksPage() {
     } else {
       setReminderTime("");
     }
+    setImportance(task.importance ?? "normal");
     setStatus(task.status);
+    setRepeat(task.repeat ?? "none");
     setFormError("");
     setIsModalOpen(true);
   };
@@ -142,7 +203,9 @@ export default function TasksPage() {
         description: description || null,
         deadline: deadlineISO,
         reminder_time: reminderISO,
-        status
+        importance,
+        status,
+        repeat,
       };
 
       if (isEditing && editId) {
@@ -160,24 +223,51 @@ export default function TasksPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this task?")) return;
-    try {
-      await api.delete(`/api/tasks/${id}`);
-      setTasks(tasks.filter((t) => t.id !== id));
-    } catch (err) {
-      console.error("Failed to delete task", err);
+  const handleDelete = (task: Task) => {
+    const existing = pendingDeletesRef.current.get(task.id);
+    if (existing) {
+      clearTimeout(existing.timerId);
     }
+
+    setTasks((prev) => prev.filter((t) => t.id !== task.id));
+
+    const timerId = setTimeout(async () => {
+      pendingDeletesRef.current.delete(task.id);
+      setUndoToast((prev) => (prev?.taskId === task.id ? null : prev));
+      try {
+        await api.delete(`/api/tasks/${task.id}`);
+      } catch (err) {
+        console.error("Failed to delete task", err);
+        setTasks((prev) => (prev.some((t) => t.id === task.id) ? prev : [...prev, task]));
+      }
+    }, 5000);
+
+    pendingDeletesRef.current.set(task.id, { task, timerId });
+    setUndoToast({ taskId: task.id, title: task.title });
+  };
+
+  const handleUndoDelete = (taskId: string) => {
+    const entry = pendingDeletesRef.current.get(taskId);
+    if (!entry) return;
+    clearTimeout(entry.timerId);
+    pendingDeletesRef.current.delete(taskId);
+    setTasks((prev) => (prev.some((t) => t.id === taskId) ? prev : [...prev, entry.task]));
+    setUndoToast((prev) => (prev?.taskId === taskId ? null : prev));
   };
 
   const handleToggleStatus = async (task: Task) => {
     const newStatus: TaskStatus = task.status === "completed" ? "pending" : "completed";
     try {
-      const updated = await api.put<{ task: Task }>(`/api/tasks/${task.id}`, {
-        ...task,
-        status: newStatus
+      const updated = await api.put<{ task: Task; nextTask?: Task }>(`/api/tasks/${task.id}`, {
+        status: newStatus,
       });
-      setTasks(tasks.map((t) => (t.id === task.id ? updated.task : t)));
+      setTasks((prev) => {
+        const mapped = prev.map((t) => (t.id === task.id ? updated.task : t));
+        if (updated.nextTask && !mapped.some((t) => t.id === updated.nextTask!.id)) {
+          return [...mapped, updated.nextTask];
+        }
+        return mapped;
+      });
     } catch (err) {
       console.error("Failed to toggle task status", err);
     }
@@ -205,31 +295,74 @@ export default function TasksPage() {
         </button>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex gap-4 border-b border-border pb-[1px] mb-4 flex-shrink-0 relative">
-        {(["today", "upcoming", "completed", "all"] as const).map((filter) => {
-          const isActive = activeFilter === filter;
-          return (
-            <button
-              key={filter}
-              onClick={() => setActiveFilter(filter)}
-              className={`relative px-2 py-2 text-sm transition-colors capitalize cursor-pointer ${
-                isActive
-                  ? "text-foreground font-semibold"
-                  : "text-muted-foreground hover:text-foreground font-medium"
-              }`}
+      {/* Filter Tabs & Controls */}
+      <div className="flex flex-col gap-3 border-b border-border pb-3 mb-4 flex-shrink-0">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap gap-3 relative">
+            {(["today", "upcoming", "in_progress", "completed", "all"] as const).map((filter) => {
+              const isActive = activeFilter === filter;
+              const label = filter === "in_progress" ? "In progress" : filter;
+              return (
+                <button
+                  key={filter}
+                  onClick={() => setActiveFilter(filter)}
+                  className={`relative px-2 py-2 text-sm transition-colors capitalize cursor-pointer ${
+                    isActive
+                      ? "text-foreground font-semibold"
+                      : "text-muted-foreground hover:text-foreground font-medium"
+                  }`}
+                >
+                  {label}
+                  {isActive && (
+                    <motion.div
+                      layoutId="activeTaskTab"
+                      className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full"
+                      transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              aria-label="Filter by subject"
+              value={selectedSubject}
+              onChange={(e) => setSelectedSubject(e.target.value)}
+              className="px-3 py-1.5 text-xs font-medium rounded-[10px] border border-border bg-card text-foreground cursor-pointer"
             >
-              {filter}
-              {isActive && (
-                <motion.div
-                  layoutId="activeTaskTab"
-                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full"
-                  transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                />
-              )}
-            </button>
-          );
-        })}
+              <option value="all">All subjects</option>
+              {subjects.map((subj) => (
+                <option key={subj} value={subj}>
+                  {subj}
+                </option>
+              ))}
+            </select>
+            <select
+              aria-label="Sort tasks"
+              value={sortByPriority ? "priority" : "deadline"}
+              onChange={(e) => {
+                const wantPriority = e.target.value === "priority";
+                if (wantPriority !== sortByPriority) toggleSortByPriority();
+              }}
+              className="px-3 py-1.5 text-xs font-medium rounded-[10px] border border-border bg-card text-foreground cursor-pointer"
+            >
+              <option value="deadline">Sort: Deadline</option>
+              <option value="priority">Sort: Priority</option>
+            </select>
+          </div>
+        </div>
+        <div className="relative max-w-sm">
+          <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by title or subject..."
+            aria-label="Search tasks"
+            className="w-full pl-9 pr-3 py-1.5 text-sm bg-card border border-border rounded-[10px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+          />
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto min-h-0 pr-1 pb-6">
@@ -238,7 +371,7 @@ export default function TasksPage() {
             <Loader2 className="w-8 h-8 text-primary animate-spin mb-2" />
             <p className="text-sm text-muted-foreground">Loading tasks...</p>
           </div>
-        ) : filteredTasks.length === 0 ? (
+        ) : displayedTasks.length === 0 ? (
           <div className="bg-card border border-border rounded-[10px] p-12 text-center shadow-sm max-w-md mx-auto mt-10">
             <ListTodo className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-foreground mb-2">No tasks found</h3>
@@ -259,7 +392,7 @@ export default function TasksPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
-            {filteredTasks.map((task) => (
+            {displayedTasks.map((task) => (
               <div
                 key={task.id}
               className={`bg-card border rounded-[10px] p-5 shadow-sm transition-all hover:shadow-md flex items-start gap-4 ${
@@ -286,9 +419,23 @@ export default function TasksPage() {
                     <h3 className={`text-base font-semibold text-foreground break-words ${task.status === "completed" ? "line-through text-muted-foreground" : ""}`}>
                       {task.title}
                     </h3>
-                    <span className="inline-block px-2 py-0.5 text-xs font-semibold bg-muted text-muted-foreground rounded-[10px] mt-1">
-                      {task.subject}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                      <span className="inline-block px-2 py-0.5 text-xs font-semibold bg-muted text-muted-foreground rounded-[10px]">
+                        {task.subject}
+                      </span>
+                      {task.status === "in_progress" && (
+                        <span className="inline-block px-2 py-0.5 text-xs font-semibold bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-[10px]">
+                          In progress
+                        </span>
+                      )}
+                      {task.repeat === "weekly" && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold bg-primary/10 text-primary rounded-[10px]">
+                          <Repeat className="w-3 h-3" />
+                          Weekly
+                        </span>
+                      )}
+                      <PriorityBadge task={task} />
+                    </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <a
@@ -308,7 +455,7 @@ export default function TasksPage() {
                       <Edit2 className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => handleDelete(task.id)}
+                      onClick={() => handleDelete(task)}
                       className="p-1.5 hover:bg-destructive/10 rounded-[10px] text-muted-foreground hover:text-destructive transition-standard cursor-pointer"
                       title="Delete task"
                     >
@@ -426,6 +573,22 @@ export default function TasksPage() {
                     />
                   </div>
                   
+                  <div>
+                    <label htmlFor="task-importance" className="block text-sm font-semibold text-foreground/80 mb-2">
+                      Importance
+                    </label>
+                    <select
+                      id="task-importance"
+                      value={importance}
+                      onChange={(e) => setImportance(e.target.value as TaskImportance)}
+                      className="w-full px-4 py-3 bg-muted/30 border border-foreground/10 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all cursor-pointer shadow-sm"
+                    >
+                      <option value="low">Low</option>
+                      <option value="normal">Normal</option>
+                      <option value="high">High</option>
+                    </select>
+                  </div>
+
                   {isEditing && (
                     <div>
                       <label className="block text-sm font-semibold text-foreground/80 mb-2">
@@ -438,11 +601,27 @@ export default function TasksPage() {
                         style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1em' }}
                       >
                         <option value="pending">Pending</option>
+                        <option value="in_progress">In progress</option>
                         <option value="completed">Completed</option>
                         <option value="cancelled">Cancelled</option>
                       </select>
                     </div>
                   )}
+
+                  <div>
+                    <label htmlFor="task-repeat" className="block text-sm font-semibold text-foreground/80 mb-2">
+                      Repeat
+                    </label>
+                    <select
+                      id="task-repeat"
+                      value={repeat}
+                      onChange={(e) => setRepeat(e.target.value as TaskRepeat)}
+                      className="w-full px-4 py-3 bg-muted/30 border border-foreground/10 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all cursor-pointer shadow-sm"
+                    >
+                      <option value="none">Does not repeat</option>
+                      <option value="weekly">Weekly</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div>
@@ -504,6 +683,23 @@ export default function TasksPage() {
               </form>
             </div>
           </div>
+        </div>
+      )}
+
+      {undoToast && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-5 right-5 z-50 flex items-center gap-3 px-4 py-3 bg-card border border-border rounded-[12px] shadow-lg text-sm text-foreground max-w-[calc(100vw-2.5rem)]"
+        >
+          <span className="truncate">Deleted &ldquo;{undoToast.title}&rdquo;</span>
+          <button
+            type="button"
+            onClick={() => handleUndoDelete(undoToast.taskId)}
+            className="px-2.5 py-1 text-xs font-semibold rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity cursor-pointer flex-shrink-0"
+          >
+            Undo
+          </button>
         </div>
       )}
     </div>

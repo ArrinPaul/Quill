@@ -4,6 +4,7 @@ const authMiddleware = require("../middleware/auth");
 const validate = require("../middleware/validate");
 const { idParamSchema } = require("../schemas/common");
 const { createQuizSchema, submitQuizSchema } = require("../schemas/quizzes");
+const { logActivity } = require("../services/activity");
 
 const router = express.Router();
 router.use(authMiddleware);
@@ -137,6 +138,8 @@ router.patch("/:id/submit", validate({ params: idParamSchema, body: submitQuizSc
         .eq("id", ans.question_id)
         .eq("quiz_id", id);
     }
+
+    await logActivity(req.student.id, "quiz_completed", quiz.title, quiz.id);
 
     res.json({ message: "Quiz submitted successfully", quiz });
   } catch (error) {

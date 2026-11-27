@@ -2,7 +2,7 @@
 
 Only the orchestrator edits this. Status: TODO, IN PROGRESS, BLOCKED, DONE, SKIPPED. Order within a phase is the order of work.
 
-**Current phase: 1 (complete — pending review)**
+**Current phase: 2 (complete — pending review)**
 
 ## Phase 1: Foundation
 
@@ -21,10 +21,10 @@ Only the orchestrator edits this. Status: TODO, IN PROGRESS, BLOCKED, DONE, SKIP
 
 | ID | Task | Status | Commit | Evidence / notes |
 |---|---|---|---|---|
-| E1 | Recent Activity | TODO | | |
-| E2 | Priority score | TODO | | |
-| E5 | Task improvements | TODO | | |
-| E10 | Calendar link | TODO | | |
+| E1 | Recent Activity | DONE | e2a0a42 | `activity_log` migration run; `logActivity` + 6 hooks + widget; `npm test` 49/49 |
+| E2 | Priority score | DONE | 7d4ef85 | `importance` migration run; `priorityOf` + 22 tests + UI sort/badges; `npm test` 50/50 |
+| E5 | Task improvements | DONE | 93a0c9f | `in_progress` + `repeat` migration run; +7d unique index; search/filter/sort/undo UI; `npm test` 52/52 |
+| E10 | Calendar link | DONE | 9dc8f4a | `feed_version` migration run; `feed-reset` + Settings card; `npm test` 54/54 |
 
 ## Phase 3: Study
 

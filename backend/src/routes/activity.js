@@ -2,7 +2,7 @@ const express = require("express");
 const { getClient } = require("../services/supabase");
 const authMiddleware = require("../middleware/auth");
 const validate = require("../middleware/validate");
-const { focusSchema } = require("../schemas/activity");
+const { focusSchema, recentQuerySchema } = require("../schemas/activity");
 
 const router = express.Router();
 router.use(authMiddleware);
@@ -138,6 +138,23 @@ router.get("/stats", async (req, res, next) => {
       streak: currentStreak, 
       totalHours: totalHours
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/recent", validate({ query: recentQuerySchema }), async (req, res, next) => {
+  try {
+    const { limit } = req.query;
+    const { data: items, error } = await getClient()
+      .from("activity_log")
+      .select("id, type, title, entity_id, created_at")
+      .eq("student_id", req.student.id)
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    if (error) throw error;
+    res.json({ items: items || [] });
   } catch (error) {
     next(error);
   }
