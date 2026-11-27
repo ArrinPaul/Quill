@@ -3,7 +3,7 @@
 import { useEscape } from "@/hooks/useEscape";
 import { useState, useEffect, useRef } from "react";
 import { Announcement01 as Megaphone, Calendar, Check, Copy01 as Copy, File04 as FileText, GitBranch01 as GitFork, Lightbulb01 as Lightbulb, Loading01 as Loader2, Shield02 as ShieldAlert, Stars01 as Sparkles, XClose as X, Upload01 as Upload, Download01 as Download } from "@untitledui/icons";
-import { api } from "@/lib/api";
+import { api, API_BASE } from "@/lib/api";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -333,7 +333,7 @@ export default function SmartToolsPage() {
                           formData.append("document", file);
                           
                           const token = localStorage.getItem("Quill_token");
-                          const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:4000"}/api/ai/parse-document`, {
+                          const res = await fetch(`${API_BASE}/api/ai/parse-document`, {
                             method: "POST",
                             headers: {
                               Authorization: `Bearer ${token}`
