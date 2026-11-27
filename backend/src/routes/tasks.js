@@ -4,6 +4,7 @@ const authMiddleware = require("../middleware/auth");
 const validate = require("../middleware/validate");
 const { idParamSchema } = require("../schemas/common");
 const { createTaskSchema, updateTaskSchema } = require("../schemas/tasks");
+const { logActivity } = require("../services/activity");
 
 const router = express.Router();
 
@@ -89,6 +90,8 @@ router.post("/", validate({ body: createTaskSchema }), async (req, res, next) =>
 
     if (error) throw error;
 
+    await logActivity(req.student.id, "task_created", task.title, task.id);
+
     res.json({ task });
   } catch (error) {
     next(error);
@@ -124,6 +127,9 @@ router.put("/:id", validate({ params: idParamSchema, body: updateTaskSchema }), 
 
     if (error) throw error;
     if (!task) return res.status(404).json({ message: "Task not found" });
+    if (status === "completed") {
+      await logActivity(req.student.id, "task_completed", task.title, task.id);
+    }
     res.json({ task });
   } catch (error) {
     next(error);

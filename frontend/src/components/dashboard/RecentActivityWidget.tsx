@@ -1,33 +1,86 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Announcement01 as Megaphone, BarChart01 as BarChart3, Bell01 as Bell, CheckCircle } from "@untitledui/icons";
+import Link from "next/link";
+import {
+  Announcement01 as Megaphone,
+  CheckCircle,
+  HelpCircle,
+  LayersTwo01 as Layers,
+  List as ListTodo,
+  PenTool01 as PenTool,
+  RefreshCw01 as RefreshCw,
+} from "@untitledui/icons";
 import { api } from "@/lib/api";
-import type { AutomationLog } from "@/features/types";
+import type { ActivityItem, ActivityType } from "@/features/types";
 
-const workflowIcons: Record<string, typeof CheckCircle> = {
-  deadline_reminder: Bell,
-  notice_broadcast: Megaphone,
-  attendance_alert: BarChart3,
+interface ActivityMeta {
+  icon: typeof CheckCircle;
+  verb: string;
+  href: string;
+  color: string;
+  bg: string;
+}
+
+const activityMeta: Record<ActivityType, ActivityMeta> = {
+  task_created: {
+    icon: ListTodo,
+    verb: "Created task",
+    href: "/dashboard/tasks",
+    color: "text-primary",
+    bg: "bg-primary/10",
+  },
+  task_completed: {
+    icon: CheckCircle,
+    verb: "Completed task",
+    href: "/dashboard/tasks",
+    color: "text-emerald-600 dark:text-emerald-400",
+    bg: "bg-emerald-500/10",
+  },
+  notice_added: {
+    icon: Megaphone,
+    verb: "Added notice",
+    href: "/dashboard/notices",
+    color: "text-amber-600 dark:text-amber-400",
+    bg: "bg-amber-500/10",
+  },
+  quiz_completed: {
+    icon: HelpCircle,
+    verb: "Completed quiz",
+    href: "/dashboard/quiz",
+    color: "text-violet-600 dark:text-violet-400",
+    bg: "bg-violet-500/10",
+  },
+  deck_created: {
+    icon: Layers,
+    verb: "Created deck",
+    href: "/dashboard/flashcards",
+    color: "text-sky-600 dark:text-sky-400",
+    bg: "bg-sky-500/10",
+  },
+  board_created: {
+    icon: PenTool,
+    verb: "Created board",
+    href: "/dashboard/whiteboard",
+    color: "text-primary",
+    bg: "bg-primary/10",
+  },
 };
 
-const workflowColors: Record<string, string> = {
-  deadline_reminder: "text-orange-500",
-  notice_broadcast: "text-primary",
-  attendance_alert: "text-emerald-500",
-};
-
-const workflowBg: Record<string, string> = {
-  deadline_reminder: "bg-orange-50",
-  notice_broadcast: "bg-primary/10",
-  attendance_alert: "bg-emerald-50",
+const fallbackMeta: ActivityMeta = {
+  icon: CheckCircle,
+  verb: "Activity",
+  href: "/dashboard",
+  color: "text-muted-foreground",
+  bg: "bg-muted",
 };
 
 function formatTimeAgo(dateStr: string): string {
-  const now = new Date();
-  const d = new Date(dateStr);
-  const diff = now.getTime() - d.getTime();
-  const minutes = Math.floor(diff / 60000);
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diffMs = Math.max(0, now - then);
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) return "just now";
   if (minutes < 60) return `${minutes}m ago`;
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}h ago`;
@@ -36,16 +89,40 @@ function formatTimeAgo(dateStr: string): string {
 }
 
 export function RecentActivityWidget() {
-  const [logs, setLogs] = useState<AutomationLog[]>([]);
+  const [items, setItems] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
+    let cancelled = false;
     api
-      .get<{ logs: AutomationLog[] }>("/api/automations")
-      .then((res) => setLogs(res.logs || []))
-      .catch(() => setLogs([]))
-      .finally(() => setLoading(false));
-  }, []);
+      .get<{ items: ActivityItem[] }>("/api/activity/recent")
+      .then((res) => {
+        if (!cancelled) {
+          setItems(res.items || []);
+          setError(null);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Could not load recent activity");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadKey]);
+
+  const handleRetry = () => {
+    setLoading(true);
+    setError(null);
+    setReloadKey((k) => k + 1);
+  };
 
   if (loading) {
     return (
@@ -58,11 +135,31 @@ export function RecentActivityWidget() {
     );
   }
 
-  if (logs.length === 0) {
+  if (error) {
+    return (
+      <div className="bg-card border border-border rounded-[10px] p-5 h-full">
+        <h3 className="font-semibold text-foreground text-sm mb-4">Recent Activity</h3>
+        <div className="flex flex-col items-center justify-center py-8 text-center">
+          <p className="text-sm font-medium text-foreground mb-1">Could not load recent activity</p>
+          <p className="text-xs text-muted-foreground mb-4">{error}</p>
+          <button
+            type="button"
+            onClick={handleRetry}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-border bg-card text-foreground hover:bg-muted transition-colors"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (items.length === 0) {
     return (
       <div className="bg-card border border-border rounded-[10px] p-5 card-hover h-full">
         <h3 className="font-semibold text-foreground text-sm mb-4">Recent Activity</h3>
-        <div className="flex flex-col items-center justify-center py-8">
+        <div className="flex flex-col items-center justify-center py-8 text-center">
           <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mb-3">
             <CheckCircle className="w-6 h-6 text-muted-foreground" />
           </div>
@@ -76,30 +173,28 @@ export function RecentActivityWidget() {
   return (
     <div className="bg-card border border-border rounded-[10px] p-5 card-hover h-full">
       <h3 className="font-semibold text-foreground text-sm mb-4">Recent Activity</h3>
-      <div className="space-y-0">
-        {logs.slice(0, 5).map((log) => {
-          const Icon = workflowIcons[log.workflow_type] || CheckCircle;
-          const color = workflowColors[log.workflow_type] || "text-muted-foreground";
-          const bg = workflowBg[log.workflow_type] || "bg-muted";
-          const label = log.workflow_type.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+      <div className="space-y-1">
+        {items.slice(0, 6).map((item) => {
+          const meta = activityMeta[item.type] || fallbackMeta;
+          const Icon = meta.icon;
 
           return (
-            <div key={log.id} className="flex items-start gap-3 py-2.5">
-              <div className={`w-8 h-8 rounded-[10px] ${bg} flex items-center justify-center flex-shrink-0`}>
-                <Icon className={`w-4 h-4 ${color}`} />
+            <Link
+              key={item.id}
+              href={meta.href}
+              className="flex items-start gap-3 py-2 px-2 -mx-2 rounded-lg hover:bg-muted/60 transition-colors"
+            >
+              <div className={`w-8 h-8 rounded-[10px] ${meta.bg} flex items-center justify-center flex-shrink-0`}>
+                <Icon className={`w-4 h-4 ${meta.color}`} />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-foreground leading-snug">{label}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{formatTimeAgo(log.created_at)}</p>
+                <p className="text-sm text-foreground leading-snug truncate">
+                  <span className="font-medium">{meta.verb}:</span>{" "}
+                  <span className="text-muted-foreground">{item.title}</span>
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">{formatTimeAgo(item.created_at)}</p>
               </div>
-              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                log.status === "success" ? "bg-emerald-50 text-emerald-600" :
-                log.status === "failed" ? "bg-destructive/10 text-destructive" :
-                "bg-primary/10 text-primary"
-              }`}>
-                {log.status}
-              </span>
-            </div>
+            </Link>
           );
         })}
       </div>

@@ -289,6 +289,17 @@ CREATE TABLE public.automation_logs (
 );
 CREATE INDEX idx_automation_logs_student_id ON public.automation_logs(student_id);
 
+-- ===== activity_log =====
+CREATE TABLE IF NOT EXISTS public.activity_log (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id UUID NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
+  type TEXT NOT NULL,
+  title TEXT NOT NULL,
+  entity_id UUID,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_activity_log_student ON public.activity_log(student_id, created_at DESC);
+
 -- ===== Later columns =====
 ALTER TABLE public.quiz_questions ADD COLUMN IF NOT EXISTS citation TEXT;
 ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;

@@ -9,6 +9,7 @@ const {
   createDeckSchema,
   updateCardStatusSchema,
 } = require("../schemas/flashcards");
+const { logActivity } = require("../services/activity");
 
 const router = express.Router();
 router.use(authMiddleware);
@@ -66,6 +67,8 @@ router.post("/decks", validate({ body: createDeckSchema }), async (req, res, nex
       await supabase.from("flashcard_decks").delete().eq("id", deck.id);
       throw cardsError;
     }
+
+    await logActivity(req.student.id, "deck_created", deck.title, deck.id);
 
     res.status(201).json({ deck, flashcards: savedCards });
   } catch (error) {

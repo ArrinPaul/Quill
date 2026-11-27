@@ -37,12 +37,19 @@ export interface Attendance {
   updated_at: string;
 }
 
-export interface AutomationLog {
+export type ActivityType =
+  | "task_created"
+  | "task_completed"
+  | "notice_added"
+  | "quiz_completed"
+  | "deck_created"
+  | "board_created";
+
+export interface ActivityItem {
   id: string;
-  student_id: string;
-  workflow_type: "deadline_reminder" | "notice_broadcast" | "attendance_alert";
-  status: "triggered" | "success" | "failed";
-  details: Record<string, unknown>;
+  type: ActivityType;
+  title: string;
+  entity_id: string | null;
   created_at: string;
 }
 

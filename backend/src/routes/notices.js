@@ -5,6 +5,7 @@ const validate = require("../middleware/validate");
 const { idParamSchema } = require("../schemas/common");
 const { noticeBodySchema } = require("../schemas/notices");
 const { summarizeNotice } = require("../services/groq");
+const { logActivity } = require("../services/activity");
 
 const router = express.Router();
 
@@ -44,6 +45,9 @@ router.post("/", validate({ body: noticeBodySchema }), async (req, res, next) =>
       .single();
 
     if (error) throw error;
+    const activityTitle =
+      (notice.event_title && notice.event_title.trim()) || notice.notice_text.slice(0, 80);
+    await logActivity(req.student.id, "notice_added", activityTitle, notice.id);
     res.json({ notice });
   } catch (error) {
     next(error);
