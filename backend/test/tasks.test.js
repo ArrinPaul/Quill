@@ -63,4 +63,34 @@ describe("Tasks ownership and validation", () => {
     assert.equal(listA.data.tasks.length, 1);
     assert.equal(listA.data.tasks[0].title, "Lab 1");
   });
+
+  it("validates and stores task importance on POST and PUT", async () => {
+    const deadline = new Date(Date.now() + 7200_000).toISOString();
+
+    const invalidCreate = await ctx.request("POST", "/api/tasks", {
+      token: userA.token,
+      body: { title: "Bad importance", subject: "CS101", deadline, importance: "urgent" },
+    });
+    assert.equal(invalidCreate.status, 400);
+
+    const createHigh = await ctx.request("POST", "/api/tasks", {
+      token: userA.token,
+      body: { title: "Exam Prep", subject: "CS101", deadline, importance: "high" },
+    });
+    assert.equal(createHigh.status, 200);
+    assert.equal(createHigh.data.task.importance, "high");
+
+    const invalidUpdate = await ctx.request("PUT", `/api/tasks/${createHigh.data.task.id}`, {
+      token: userA.token,
+      body: { importance: "critical" },
+    });
+    assert.equal(invalidUpdate.status, 400);
+
+    const updateLow = await ctx.request("PUT", `/api/tasks/${createHigh.data.task.id}`, {
+      token: userA.token,
+      body: { importance: "low" },
+    });
+    assert.equal(updateLow.status, 200);
+    assert.equal(updateLow.data.task.importance, "low");
+  });
 });

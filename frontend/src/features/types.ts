@@ -1,5 +1,7 @@
 export type TaskStatus = "pending" | "completed" | "cancelled";
 
+export type TaskImportance = "low" | "normal" | "high";
+
 export type TaskFilter = "today" | "upcoming" | "completed" | "all";
 
 export interface Task {
@@ -11,6 +13,7 @@ export interface Task {
   deadline: string;
   reminder_time: string | null;
   add_to_calendar: boolean;
+  importance?: TaskImportance;
   status: TaskStatus;
   n8n_triggered: boolean;
   created_at: string;

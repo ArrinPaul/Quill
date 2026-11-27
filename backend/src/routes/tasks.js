@@ -70,7 +70,7 @@ router.get("/upcoming", async (req, res, next) => {
 
 router.post("/", validate({ body: createTaskSchema }), async (req, res, next) => {
   try {
-    const { title, subject, description, deadline, reminder_time, add_to_calendar } = req.body;
+    const { title, subject, description, deadline, reminder_time, add_to_calendar, importance } = req.body;
 
     const reminder = reminder_time || new Date(new Date(deadline).getTime() - 86400000).toISOString();
 
@@ -84,6 +84,7 @@ router.post("/", validate({ body: createTaskSchema }), async (req, res, next) =>
         deadline,
         reminder_time: reminder,
         add_to_calendar: add_to_calendar !== false,
+        importance: importance ?? "normal",
       })
       .select()
       .single();
@@ -100,9 +101,12 @@ router.post("/", validate({ body: createTaskSchema }), async (req, res, next) =>
 
 router.put("/:id", validate({ params: idParamSchema, body: updateTaskSchema }), async (req, res, next) => {
   try {
-    const { title, subject, description, deadline, reminder_time, status } = req.body;
+    const { title, subject, description, deadline, reminder_time, status, importance } = req.body;
 
     const updatePayload = { title, subject, description, deadline, status };
+    if (importance !== undefined) {
+      updatePayload.importance = importance;
+    }
     if (status !== undefined) {
       const { data: current } = await getClient()
         .from("tasks")

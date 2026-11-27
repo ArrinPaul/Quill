@@ -26,6 +26,7 @@ CREATE TABLE public.tasks (
   deadline TIMESTAMPTZ NOT NULL,
   reminder_time TIMESTAMPTZ,
   add_to_calendar BOOLEAN DEFAULT TRUE,
+  importance TEXT NOT NULL DEFAULT 'normal' CHECK (importance IN ('low','normal','high')),
   status TEXT CHECK (status IN ('pending','completed','cancelled')) DEFAULT 'pending',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );

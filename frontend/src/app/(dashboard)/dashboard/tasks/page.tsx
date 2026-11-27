@@ -6,8 +6,11 @@ import { ArrowLeft, Bell01 as Bell, Calendar, Check, Edit01 as Edit2, List as Li
 import { api } from "@/lib/api";
 import { daysUntil } from "@/lib/utils";
 import { motion } from "framer-motion";
-import type { Task, TaskStatus } from "@/features/types";
+import type { Task, TaskImportance, TaskStatus } from "@/features/types";
 import { generateGoogleCalendarUrl } from "@/lib/calendar";
+import { sortTasksByPriority } from "@/lib/priority";
+import { PriorityBadge } from "@/features/tasks/components/PriorityBadge";
+import { usePrioritySort } from "@/features/tasks/hooks/usePrioritySort";
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -26,7 +29,9 @@ export default function TasksPage() {
   const [description, setDescription] = useState("");
   const [deadline, setDeadline] = useState("");
   const [reminderTime, setReminderTime] = useState("");
+  const [importance, setImportance] = useState<TaskImportance>("normal");
   const [status, setStatus] = useState<TaskStatus>("pending");
+  const { sortByPriority, toggleSortByPriority } = usePrioritySort("quill.tasks.sortByPriority");
   
   const [formError, setFormError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -83,6 +88,8 @@ export default function TasksPage() {
     return true;
   });
 
+  const displayedTasks = sortByPriority ? sortTasksByPriority(filteredTasks) : filteredTasks;
+
   const handleOpenCreateModal = () => {
     setIsEditing(false);
     setEditId(null);
@@ -91,6 +98,7 @@ export default function TasksPage() {
     setDescription("");
     setDeadline("");
     setReminderTime("");
+    setImportance("normal");
     setStatus("pending");
     setFormError("");
     setIsModalOpen(true);
@@ -117,6 +125,7 @@ export default function TasksPage() {
     } else {
       setReminderTime("");
     }
+    setImportance(task.importance ?? "normal");
     setStatus(task.status);
     setFormError("");
     setIsModalOpen(true);
@@ -142,6 +151,7 @@ export default function TasksPage() {
         description: description || null,
         deadline: deadlineISO,
         reminder_time: reminderISO,
+        importance,
         status
       };
 
@@ -205,31 +215,45 @@ export default function TasksPage() {
         </button>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex gap-4 border-b border-border pb-[1px] mb-4 flex-shrink-0 relative">
-        {(["today", "upcoming", "completed", "all"] as const).map((filter) => {
-          const isActive = activeFilter === filter;
-          return (
-            <button
-              key={filter}
-              onClick={() => setActiveFilter(filter)}
-              className={`relative px-2 py-2 text-sm transition-colors capitalize cursor-pointer ${
-                isActive
-                  ? "text-foreground font-semibold"
-                  : "text-muted-foreground hover:text-foreground font-medium"
-              }`}
-            >
-              {filter}
-              {isActive && (
-                <motion.div
-                  layoutId="activeTaskTab"
-                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full"
-                  transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                />
-              )}
-            </button>
-          );
-        })}
+      {/* Filter Tabs & Sort */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-[1px] mb-4 flex-shrink-0">
+        <div className="flex gap-4 relative">
+          {(["today", "upcoming", "completed", "all"] as const).map((filter) => {
+            const isActive = activeFilter === filter;
+            return (
+              <button
+                key={filter}
+                onClick={() => setActiveFilter(filter)}
+                className={`relative px-2 py-2 text-sm transition-colors capitalize cursor-pointer ${
+                  isActive
+                    ? "text-foreground font-semibold"
+                    : "text-muted-foreground hover:text-foreground font-medium"
+                }`}
+              >
+                {filter}
+                {isActive && (
+                  <motion.div
+                    layoutId="activeTaskTab"
+                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full"
+                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                  />
+                )}
+              </button>
+            );
+          })}
+        </div>
+        <button
+          type="button"
+          onClick={toggleSortByPriority}
+          aria-pressed={sortByPriority}
+          className={`px-3 py-1.5 mb-1 text-xs font-medium rounded-[10px] border transition-colors cursor-pointer ${
+            sortByPriority
+              ? "bg-primary/10 text-primary border-primary/30"
+              : "bg-card text-muted-foreground border-border hover:text-foreground"
+          }`}
+        >
+          Sort by priority
+        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto min-h-0 pr-1 pb-6">
@@ -238,7 +262,7 @@ export default function TasksPage() {
             <Loader2 className="w-8 h-8 text-primary animate-spin mb-2" />
             <p className="text-sm text-muted-foreground">Loading tasks...</p>
           </div>
-        ) : filteredTasks.length === 0 ? (
+        ) : displayedTasks.length === 0 ? (
           <div className="bg-card border border-border rounded-[10px] p-12 text-center shadow-sm max-w-md mx-auto mt-10">
             <ListTodo className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-foreground mb-2">No tasks found</h3>
@@ -259,7 +283,7 @@ export default function TasksPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
-            {filteredTasks.map((task) => (
+            {displayedTasks.map((task) => (
               <div
                 key={task.id}
               className={`bg-card border rounded-[10px] p-5 shadow-sm transition-all hover:shadow-md flex items-start gap-4 ${
@@ -286,9 +310,12 @@ export default function TasksPage() {
                     <h3 className={`text-base font-semibold text-foreground break-words ${task.status === "completed" ? "line-through text-muted-foreground" : ""}`}>
                       {task.title}
                     </h3>
-                    <span className="inline-block px-2 py-0.5 text-xs font-semibold bg-muted text-muted-foreground rounded-[10px] mt-1">
-                      {task.subject}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                      <span className="inline-block px-2 py-0.5 text-xs font-semibold bg-muted text-muted-foreground rounded-[10px]">
+                        {task.subject}
+                      </span>
+                      <PriorityBadge task={task} />
+                    </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <a
@@ -426,6 +453,22 @@ export default function TasksPage() {
                     />
                   </div>
                   
+                  <div>
+                    <label htmlFor="task-importance" className="block text-sm font-semibold text-foreground/80 mb-2">
+                      Importance
+                    </label>
+                    <select
+                      id="task-importance"
+                      value={importance}
+                      onChange={(e) => setImportance(e.target.value as TaskImportance)}
+                      className="w-full px-4 py-3 bg-muted/30 border border-foreground/10 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all cursor-pointer shadow-sm"
+                    >
+                      <option value="low">Low</option>
+                      <option value="normal">Normal</option>
+                      <option value="high">High</option>
+                    </select>
+                  </div>
+
                   {isEditing && (
                     <div>
                       <label className="block text-sm font-semibold text-foreground/80 mb-2">

@@ -623,7 +623,7 @@ const aiFeatures = [
   {
     icon: TrendingUp,
     title: "Smart Priority Scoring",
-    description: "AI ranks your tasks by urgency and importance automatically, so you always know what to tackle first.",
+    description: "Quill ranks by urgency and importance automatically, so you always know what to tackle first.",
     color: "bg-amber-500",
     gradient: "from-amber-500 to-amber-400",
   },
