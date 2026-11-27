@@ -3,50 +3,61 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { getClient } = require("../services/supabase");
 const authMiddleware = require("../middleware/auth");
+const validate = require("../middleware/validate");
+const { authIpLimiter, loginEmailLimiter } = require("../middleware/rateLimit");
+const {
+  checkEmailSchema,
+  registerSchema,
+  loginSchema,
+  updateProfileSchema,
+  changePasswordSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+} = require("../schemas/auth");
 const { isEmailConfigured, sendPasswordReset } = require("../services/email");
 
 const router = express.Router();
 
-router.use((req, res, next) => {
-  if (typeof req.body?.email === "string") req.body.email = req.body.email.trim().toLowerCase();
-  next();
-});
+function signSessionToken(student, tokenVersion = student.token_version ?? 0) {
+  return jwt.sign(
+    { id: student.id, email: student.email, tv: tokenVersion },
+    process.env.JWT_SECRET,
+    { expiresIn: "7d" }
+  );
+}
 
-router.post("/check-email", async (req, res) => {
+router.post("/check-email", authIpLimiter, validate({ body: checkEmailSchema }), async (req, res, next) => {
   try {
     const { email } = req.body;
-    if (!email) return res.status(400).json({ message: "Email is required" });
 
-    const { data: existing } = await getClient()
+    const { data: existing, error } = await getClient()
       .from("students")
       .select("id")
       .eq("email", email)
       .limit(1);
 
+    if (error) throw error;
     if (existing && existing.length > 0) {
       return res.status(400).json({ message: "Email already registered" });
     }
-    
+
     res.json({ available: true });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 });
 
-router.post("/register", async (req, res) => {
+router.post("/register", authIpLimiter, validate({ body: registerSchema }), async (req, res, next) => {
   try {
     const { name, email, password, branch, year, subjects } = req.body;
 
-    if (!name || !email || !password || !branch || !year) {
-      return res.status(400).json({ message: "All fields are required" });
-    }
-
-    const { data: existing } = await getClient()
+    const { data: existing, error: existingError } = await getClient()
       .from("students")
       .select("id")
       .eq("email", email)
       .limit(1);
 
+    if (existingError) throw existingError;
     if (existing && existing.length > 0) {
       return res.status(400).json({ message: "Email already registered" });
     }
@@ -61,32 +72,24 @@ router.post("/register", async (req, res) => {
         password_hash,
         branch,
         year,
-        subjects: subjects || [],
+        subjects,
       })
       .select("id, name, email, branch, year, subjects, created_at")
       .single();
 
     if (error) throw error;
 
-    const token = jwt.sign(
-      { id: student.id, email: student.email },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    const token = signSessionToken(student);
 
     res.json({ token, student });
   } catch (error) {
-    res.status(500).json({ message: error.message || "Registration failed" });
+    next(error);
   }
 });
 
-router.post("/login", async (req, res) => {
+router.post("/login", authIpLimiter, loginEmailLimiter, validate({ body: loginSchema }), async (req, res, next) => {
   try {
     const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ message: "Email and password are required" });
-    }
 
     const { data: student, error } = await getClient()
       .from("students")
@@ -103,20 +106,16 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    const token = jwt.sign(
-      { id: student.id, email: student.email },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    const token = signSessionToken(student);
 
     const { password_hash, ...studentData } = student;
     res.json({ token, student: studentData });
   } catch (error) {
-    res.status(500).json({ message: error.message || "Login failed" });
+    next(error);
   }
 });
 
-router.get("/me", authMiddleware, async (req, res) => {
+router.get("/me", authMiddleware, async (req, res, next) => {
   try {
     if (req.student.id === "00000000-0000-0000-0000-000000000000") {
       return res.json({ student: req.student });
@@ -134,11 +133,11 @@ router.get("/me", authMiddleware, async (req, res) => {
 
     res.json({ student });
   } catch (error) {
-    res.status(500).json({ message: error.message || "Failed to fetch profile" });
+    next(error);
   }
 });
 
-router.put("/me", authMiddleware, async (req, res) => {
+router.put("/me", authMiddleware, validate({ body: updateProfileSchema }), async (req, res, next) => {
   try {
     const { name, branch, year, subjects } = req.body;
 
@@ -152,24 +151,18 @@ router.put("/me", authMiddleware, async (req, res) => {
     if (error) throw error;
     res.json({ student });
   } catch (error) {
-    res.status(500).json({ message: error.message || "Failed to update profile" });
+    next(error);
   }
 });
 
-router.put("/password", authMiddleware, async (req, res) => {
+router.put("/password", authMiddleware, validate({ body: changePasswordSchema }), async (req, res, next) => {
   try {
     const { currentPassword, newPassword } = req.body;
-    if (!currentPassword || !newPassword) {
-      return res.status(400).json({ message: "Current password and new password are required" });
-    }
-    if (newPassword.length < 6) {
-      return res.status(400).json({ message: "New password must be at least 6 characters" });
-    }
 
     const supabase = getClient();
     const { data: student, error: fetchError } = await supabase
       .from("students")
-      .select("id, password_hash")
+      .select("id, email, password_hash, token_version")
       .eq("id", req.student.id)
       .single();
 
@@ -183,24 +176,23 @@ router.put("/password", authMiddleware, async (req, res) => {
     }
 
     const password_hash = await bcrypt.hash(newPassword, 10);
+    const nextTokenVersion = (student.token_version ?? 0) + 1;
     const { error: updateError } = await supabase
       .from("students")
-      .update({ password_hash })
+      .update({ password_hash, token_version: nextTokenVersion })
       .eq("id", req.student.id);
 
     if (updateError) throw updateError;
-    res.json({ message: "Password updated successfully" });
+    const token = signSessionToken(student, nextTokenVersion);
+    res.json({ message: "Password updated successfully", token });
   } catch (error) {
-    res.status(500).json({ message: error.message || "Failed to update password" });
+    next(error);
   }
 });
 
-router.post("/forgot-password", async (req, res) => {
+router.post("/forgot-password", authIpLimiter, validate({ body: forgotPasswordSchema }), async (req, res, next) => {
   try {
     const { email } = req.body;
-    if (!email) {
-      return res.status(400).json({ message: "Email is required" });
-    }
 
     // Without an email provider, the link is only ever shown on a local development server
     const showLink = !isEmailConfigured() && process.env.DEV_MODE === "true" && process.env.NODE_ENV !== "production";
@@ -239,19 +231,13 @@ router.post("/forgot-password", async (req, res) => {
     sendPasswordReset(student.email, resetUrl).catch((err) => console.error("Password reset email failed:", err.message));
     res.json({ message });
   } catch (error) {
-    res.status(500).json({ message: error.message || "Failed to process password reset" });
+    next(error);
   }
 });
 
-router.post("/reset-password", async (req, res) => {
+router.post("/reset-password", authIpLimiter, validate({ body: resetPasswordSchema }), async (req, res, next) => {
   try {
     const { token, newPassword } = req.body;
-    if (!token || !newPassword) {
-      return res.status(400).json({ message: "Reset token and new password are required" });
-    }
-    if (newPassword.length < 6) {
-      return res.status(400).json({ message: "New password must be at least 6 characters" });
-    }
 
     let decoded;
     try {
@@ -267,7 +253,7 @@ router.post("/reset-password", async (req, res) => {
     const supabase = getClient();
     const { data: student, error: fetchError } = await supabase
       .from("students")
-      .select("id, password_hash")
+      .select("id, password_hash, token_version")
       .eq("id", decoded.id)
       .single();
 
@@ -276,19 +262,20 @@ router.post("/reset-password", async (req, res) => {
     }
 
     const password_hash = await bcrypt.hash(newPassword, 10);
+    const nextTokenVersion = (student.token_version ?? 0) + 1;
     const { error: updateError } = await supabase
       .from("students")
-      .update({ password_hash })
+      .update({ password_hash, token_version: nextTokenVersion })
       .eq("id", student.id);
 
     if (updateError) throw updateError;
     res.json({ message: "Password has been reset successfully. You can now log in." });
   } catch (error) {
-    res.status(500).json({ message: error.message || "Failed to reset password" });
+    next(error);
   }
 });
 
-router.delete("/me", authMiddleware, async (req, res) => {
+router.delete("/me", authMiddleware, async (req, res, next) => {
   try {
     const supabase = getClient();
     const studentId = req.student.id;
@@ -297,16 +284,22 @@ router.delete("/me", authMiddleware, async (req, res) => {
     await supabase.from("tasks").delete().eq("student_id", studentId);
     await supabase.from("flashcard_decks").delete().eq("student_id", studentId);
     await supabase.from("quizzes").delete().eq("student_id", studentId);
-    
+
     // Finally, delete the student record
-    const { error } = await supabase.from("students").delete().eq("id", studentId);
-    
+    const { data, error } = await supabase
+      .from("students")
+      .delete()
+      .eq("id", studentId)
+      .select("id");
+
     if (error) throw error;
+    if (!data || data.length === 0) {
+      return res.status(404).json({ message: "Student not found" });
+    }
 
     res.json({ message: "Account deleted successfully" });
   } catch (error) {
-    console.error("Delete account error:", error.message);
-    res.status(500).json({ message: error.message || "Failed to delete account" });
+    next(error);
   }
 });
 

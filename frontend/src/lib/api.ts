@@ -1,4 +1,11 @@
-const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:4000";
+/** Resolve the backend base URL. Empty string means same-origin `/api` (used on Vercel). */
+export function resolveApiBaseUrl(
+  envUrl: string | undefined = process.env.NEXT_PUBLIC_BACKEND_URL
+): string {
+  return envUrl ?? "http://localhost:4000";
+}
+
+export const API_BASE = resolveApiBaseUrl();
 
 interface RequestOptions extends RequestInit {
   token?: string;
@@ -23,7 +30,7 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
 
   let res: Response;
   try {
-    res = await fetch(`${API_URL}${endpoint}`, {
+    res = await fetch(`${API_BASE}${endpoint}`, {
       cache: "no-store",
       ...fetchOptions,
       headers,
@@ -33,8 +40,18 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
   }
 
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ message: "Something went wrong" }));
-    throw new Error(error.message || `Request failed with status ${res.status}`);
+    if (res.status === 401 && headers["Authorization"] && typeof window !== "undefined") {
+      localStorage.removeItem("Quill_token");
+      if (window.location.pathname !== "/login") {
+        window.location.href = "/login";
+      }
+    }
+    const fallback =
+      res.status === 429
+        ? "Too many attempts. Please try again later."
+        : "Something went wrong";
+    const error = await res.json().catch(() => ({ message: fallback }));
+    throw new Error(error.message || (res.status === 429 ? fallback : `Request failed with status ${res.status}`));
   }
 
   return res.json();

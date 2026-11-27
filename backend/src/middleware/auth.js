@@ -28,10 +28,17 @@ async function authMiddleware(req, res, next) {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     if (decoded.purpose) throw new Error("Not a session token");
 
-    // Reject tokens that outlive a deleted account
-    const { data, error } = await getClient().from("students").select("id").eq("id", decoded.id).maybeSingle();
+    // Reject tokens that outlive a deleted account or a password change/reset
+    const { data, error } = await getClient()
+      .from("students")
+      .select("id, token_version")
+      .eq("id", decoded.id)
+      .maybeSingle();
     if (error) return res.status(503).json({ message: "Could not verify your session. Please try again." });
     if (!data) return res.status(401).json({ message: "Account no longer exists" });
+    if ((decoded.tv ?? 0) !== (data.token_version ?? 0)) {
+      return res.status(401).json({ message: "Session expired. Please log in again." });
+    }
 
     req.student = decoded;
     next();

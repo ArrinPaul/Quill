@@ -14,4 +14,8 @@ function getClient() {
   return supabase;
 }
 
-module.exports = { getClient };
+function setClient(client) {
+  supabase = client;
+}
+
+module.exports = { getClient, setClient };

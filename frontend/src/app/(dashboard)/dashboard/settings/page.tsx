@@ -117,10 +117,13 @@ export default function SettingsPage() {
 
     setChangingPassword(true);
     try {
-      await api.put("/api/auth/password", {
+      const res = await api.put<{ message: string; token?: string }>("/api/auth/password", {
         currentPassword,
         newPassword,
       });
+      if (res.token) {
+        localStorage.setItem("Quill_token", res.token);
+      }
       setCurrentPassword("");
       setNewPassword("");
       setConfirmNewPassword("");

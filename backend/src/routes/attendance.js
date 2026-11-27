@@ -1,12 +1,15 @@
 const express = require("express");
 const { getClient } = require("../services/supabase");
 const authMiddleware = require("../middleware/auth");
+const validate = require("../middleware/validate");
+const { idParamSchema } = require("../schemas/common");
+const { upsertAttendanceSchema } = require("../schemas/attendance");
 
 const router = express.Router();
 
 router.use(authMiddleware);
 
-router.get("/", async (req, res) => {
+router.get("/", async (req, res, next) => {
   try {
     const { data: attendance, error } = await getClient()
       .from("attendance")
@@ -17,26 +20,13 @@ router.get("/", async (req, res) => {
     if (error) throw error;
     res.json({ attendance });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 });
 
-router.post("/", async (req, res) => {
+router.post("/", validate({ body: upsertAttendanceSchema }), async (req, res, next) => {
   try {
     const { subject, total_classes, attended_classes, threshold } = req.body;
-
-    if (!subject || total_classes === undefined || attended_classes === undefined) {
-      return res.status(400).json({ message: "Subject, total classes, and attended classes are required" });
-    }
-
-    const target = threshold === undefined || threshold === null || threshold === "" ? 75 : Number(threshold);
-    const isCount = (n) => Number.isInteger(n) && n >= 0;
-    if (!isCount(total_classes) || !isCount(attended_classes) || attended_classes > total_classes) {
-      return res.status(400).json({ message: "Class counts must be whole numbers, with attended no greater than total" });
-    }
-    if (!Number.isFinite(target) || target < 0 || target > 100) {
-      return res.status(400).json({ message: "Threshold must be between 0 and 100" });
-    }
 
     const { data: existing } = await getClient()
       .from("attendance")
@@ -50,7 +40,7 @@ router.post("/", async (req, res) => {
     if (existing) {
       const { data, error } = await getClient()
         .from("attendance")
-        .update({ total_classes, attended_classes, threshold: target, updated_at: new Date().toISOString() })
+        .update({ total_classes, attended_classes, threshold, updated_at: new Date().toISOString() })
         .eq("id", existing.id)
         .select()
         .single();
@@ -65,7 +55,7 @@ router.post("/", async (req, res) => {
           subject,
           total_classes,
           attended_classes,
-          threshold: target,
+          threshold,
         })
         .select()
         .single();
@@ -76,22 +66,24 @@ router.post("/", async (req, res) => {
 
     res.json({ attendance: record });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 });
 
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", validate({ params: idParamSchema }), async (req, res, next) => {
   try {
-    const { error } = await getClient()
+    const { data, error } = await getClient()
       .from("attendance")
       .delete()
       .eq("id", req.params.id)
-      .eq("student_id", req.student.id);
+      .eq("student_id", req.student.id)
+      .select("id");
 
     if (error) throw error;
+    if (!data || data.length === 0) return res.status(404).json({ message: "Attendance record not found" });
     res.json({ message: "Attendance record deleted" });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 });
 

@@ -6,7 +6,7 @@ const router = express.Router();
 
 router.use(authMiddleware);
 
-router.get("/", async (req, res) => {
+router.get("/", async (req, res, next) => {
   try {
     const supabase = getClient();
     const studentId = req.student.id;
@@ -168,7 +168,7 @@ router.get("/", async (req, res) => {
     });
 
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 });
 

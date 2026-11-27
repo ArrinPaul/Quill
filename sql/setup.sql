@@ -12,6 +12,7 @@ CREATE TABLE public.students (
   subjects TEXT[] NOT NULL DEFAULT '{}',
   email TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
+  token_version INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

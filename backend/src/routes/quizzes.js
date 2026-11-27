@@ -1,12 +1,15 @@
 const express = require("express");
 const { getClient } = require("../services/supabase");
 const authMiddleware = require("../middleware/auth");
+const validate = require("../middleware/validate");
+const { idParamSchema } = require("../schemas/common");
+const { createQuizSchema, submitQuizSchema } = require("../schemas/quizzes");
 
 const router = express.Router();
 router.use(authMiddleware);
 
 // GET /api/quizzes - List all quizzes for the student
-router.get("/", async (req, res) => {
+router.get("/", async (req, res, next) => {
   try {
     const { data: quizzes, error } = await getClient()
       .from("quizzes")
@@ -17,12 +20,12 @@ router.get("/", async (req, res) => {
     if (error) throw error;
     res.json({ quizzes });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 });
 
 // GET /api/quizzes/:id - Get a specific quiz with its questions
-router.get("/:id", async (req, res) => {
+router.get("/:id", validate({ params: idParamSchema }), async (req, res, next) => {
   try {
     const { id } = req.params;
     const supabase = getClient();
@@ -50,17 +53,14 @@ router.get("/:id", async (req, res) => {
 
     res.json({ quiz, questions });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 });
 
 // POST /api/quizzes - Save a newly generated quiz
-router.post("/", async (req, res) => {
+router.post("/", validate({ body: createQuizSchema }), async (req, res, next) => {
   try {
     const { title, questions } = req.body;
-    if (!title || !questions || !Array.isArray(questions)) {
-      return res.status(400).json({ message: "Title and questions array are required" });
-    }
 
     const supabase = getClient();
 
@@ -100,20 +100,16 @@ router.post("/", async (req, res) => {
 
     res.status(201).json({ quiz, questions: savedQuestions });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 });
 
 // PATCH /api/quizzes/:id/submit - Submit final score and answers
-router.patch("/:id/submit", async (req, res) => {
+router.patch("/:id/submit", validate({ params: idParamSchema, body: submitQuizSchema }), async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { score, answers } = req.body; 
+    const { score, answers } = req.body;
     // answers should be an array of objects: { question_id: UUID, user_answer_index: INT, is_correct: BOOLEAN }
-
-    if (score === undefined || !Array.isArray(answers)) {
-      return res.status(400).json({ message: "Score and answers array are required" });
-    }
 
     const supabase = getClient();
 
@@ -144,24 +140,26 @@ router.patch("/:id/submit", async (req, res) => {
 
     res.json({ message: "Quiz submitted successfully", quiz });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 });
 
 // DELETE /api/quizzes/:id - Delete a quiz
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", validate({ params: idParamSchema }), async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { error } = await getClient()
+    const { data, error } = await getClient()
       .from("quizzes")
       .delete()
       .eq("id", id)
-      .eq("student_id", req.student.id);
+      .eq("student_id", req.student.id)
+      .select("id");
 
     if (error) throw error;
+    if (!data || data.length === 0) return res.status(404).json({ message: "Quiz not found" });
     res.json({ message: "Quiz deleted" });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 });
 

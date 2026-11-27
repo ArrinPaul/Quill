@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import mermaid from "mermaid";
+import { API_BASE } from "@/lib/api";
 import {
   Activity,
   ArrowLeft,
@@ -179,12 +180,10 @@ export default function ArchitectureDashboardPage() {
   const [selectedGroup, setSelectedGroup] = useState<string>("All");
   const [search, setSearch] = useState("");
 
-  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:4000";
-
   const checkHealth = async () => {
     setBackendStatus("checking");
     try {
-      const res = await fetch(`${backendUrl}/api/health`, { cache: "no-store" });
+      const res = await fetch(`${API_BASE}/api/health`, { cache: "no-store" });
       if (res.ok) {
         setBackendStatus("online");
         setLastChecked(new Date().toLocaleTimeString());
@@ -343,7 +342,7 @@ export default function ArchitectureDashboardPage() {
                 Backend API Explorer ({filteredEndpoints.length})
               </h2>
               <p className="text-xs text-muted-foreground">
-                Base URL: <code>{backendUrl}</code>
+                Base URL: <code>{API_BASE || "(same origin)"}</code>
               </p>
             </div>
             <input

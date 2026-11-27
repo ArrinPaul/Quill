@@ -38,7 +38,7 @@ Phase N = Step N of the plans.
 **End of phase**
 1. Run all checks and a regression pass (login, tasks, notices, attendance, flashcards, quiz, whiteboard, settings).
 2. Write `Documents/handoff/step-N.md`.
-3. **Stop.** The owner has Claude Code review and merge. Do not begin the next phase.
+3. **Stop.** Open a PR to `main` (when asked by the owner) so CI and **CodeRabbit PR review** (configured in `.coderabbit.yaml`) run before merging to `main`. The owner has CodeRabbit / Claude Code review and merge. Do not begin the next phase without approval.
 
 ## 4. Shared resources
 - One Builder at a time. No parallel code changes.

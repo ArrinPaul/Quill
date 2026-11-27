@@ -1,6 +1,14 @@
 const express = require("express");
 const { getClient } = require("../services/supabase");
 const authMiddleware = require("../middleware/auth");
+const validate = require("../middleware/validate");
+const { idParamSchema } = require("../schemas/common");
+const {
+  deckIdParamSchema,
+  cardInputSchema,
+  createDeckSchema,
+  updateCardStatusSchema,
+} = require("../schemas/flashcards");
 
 const router = express.Router();
 router.use(authMiddleware);
@@ -8,7 +16,7 @@ router.use(authMiddleware);
 // --- Flashcard Decks & Cards ---
 
 // Get all decks
-router.get("/decks", async (req, res) => {
+router.get("/decks", async (req, res, next) => {
   try {
     const { data: decks, error } = await getClient()
       .from("flashcard_decks")
@@ -19,22 +27,14 @@ router.get("/decks", async (req, res) => {
     if (error) throw error;
     res.json({ decks });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 });
 
 // Save a new deck with flashcards
-router.post("/decks", async (req, res) => {
+router.post("/decks", validate({ body: createDeckSchema }), async (req, res, next) => {
   try {
     const { title, flashcards } = req.body;
-    if (!title || !flashcards || !Array.isArray(flashcards)) {
-      return res.status(400).json({ message: "Deck title and flashcards array are required" });
-    }
-
-    const isText = (v) => typeof v === "string" && v.trim() !== "";
-    if (!isText(title) || flashcards.length === 0 || !flashcards.every((c) => c && isText(c.front) && isText(c.back))) {
-      return res.status(400).json({ message: "A title and at least one card with a front and back are required" });
-    }
 
     const supabase = getClient();
 
@@ -69,33 +69,32 @@ router.post("/decks", async (req, res) => {
 
     res.status(201).json({ deck, flashcards: savedCards });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 });
 
 // Delete a deck and its flashcards
-router.delete("/decks/:deckId", async (req, res) => {
+router.delete("/decks/:deckId", validate({ params: deckIdParamSchema }), async (req, res, next) => {
   try {
-    const { error } = await getClient()
+    const { data, error } = await getClient()
       .from("flashcard_decks")
       .delete()
       .eq("id", req.params.deckId)
-      .eq("student_id", req.student.id);
+      .eq("student_id", req.student.id)
+      .select("id");
 
     if (error) throw error;
+    if (!data || data.length === 0) return res.status(404).json({ message: "Deck not found" });
     res.json({ message: "Deck deleted" });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 });
 
 // Add a manual card to an existing deck
-router.post("/decks/:deckId/cards", async (req, res) => {
+router.post("/decks/:deckId/cards", validate({ params: deckIdParamSchema, body: cardInputSchema }), async (req, res, next) => {
   try {
     const { front, back, citation } = req.body;
-    if (typeof front !== "string" || typeof back !== "string" || !front.trim() || !back.trim()) {
-      return res.status(400).json({ message: "Front and back are required" });
-    }
 
     const supabase = getClient();
     const { data: deck, error: deckError } = await supabase
@@ -113,9 +112,9 @@ router.post("/decks/:deckId/cards", async (req, res) => {
       .from("flashcards")
       .insert({
         deck_id: deck.id,
-        front: front.trim(),
-        back: back.trim(),
-        citation: citation ? citation.trim() : null,
+        front,
+        back,
+        citation: citation || null,
         status: "unseen",
       })
       .select()
@@ -124,17 +123,14 @@ router.post("/decks/:deckId/cards", async (req, res) => {
     if (error) throw error;
     res.status(201).json({ card });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 });
 
 // Edit an existing flashcard
-router.put("/:id", async (req, res) => {
+router.put("/:id", validate({ params: idParamSchema, body: cardInputSchema }), async (req, res, next) => {
   try {
     const { front, back, citation } = req.body;
-    if (typeof front !== "string" || typeof back !== "string" || !front.trim() || !back.trim()) {
-      return res.status(400).json({ message: "Front and back are required" });
-    }
 
     const supabase = getClient();
     const { data: existing, error: fetchError } = await supabase
@@ -151,9 +147,9 @@ router.put("/:id", async (req, res) => {
     const { data: card, error } = await supabase
       .from("flashcards")
       .update({
-        front: front.trim(),
-        back: back.trim(),
-        citation: citation ? citation.trim() : null,
+        front,
+        back,
+        citation: citation || null,
         updated_at: new Date().toISOString(),
       })
       .eq("id", req.params.id)
@@ -163,12 +159,12 @@ router.put("/:id", async (req, res) => {
     if (error) throw error;
     res.json({ card });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 });
 
 // Delete a flashcard
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", validate({ params: idParamSchema }), async (req, res, next) => {
   try {
     const supabase = getClient();
     const { data: existing, error: fetchError } = await supabase
@@ -182,21 +178,23 @@ router.delete("/:id", async (req, res) => {
       return res.status(404).json({ message: "Flashcard not found" });
     }
 
-    const { error } = await supabase.from("flashcards").delete().eq("id", req.params.id);
+    const { data, error } = await supabase
+      .from("flashcards")
+      .delete()
+      .eq("id", req.params.id)
+      .select("id");
     if (error) throw error;
+    if (!data || data.length === 0) return res.status(404).json({ message: "Flashcard not found" });
     res.json({ message: "Flashcard deleted" });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 });
 
 // Update flashcard status & SM-2 spaced repetition schedule
-router.patch("/:id/status", async (req, res) => {
+router.patch("/:id/status", validate({ params: idParamSchema, body: updateCardStatusSchema }), async (req, res, next) => {
   try {
     const { status } = req.body;
-    if (!["unseen", "review", "mastered"].includes(status)) {
-      return res.status(400).json({ message: "Invalid status" });
-    }
 
     const supabase = getClient();
     const { data: existing, error: fetchError } = await supabase
@@ -261,7 +259,7 @@ router.patch("/:id/status", async (req, res) => {
 
     res.json({ card });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 });
 

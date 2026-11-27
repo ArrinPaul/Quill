@@ -2,20 +2,20 @@
 
 Only the orchestrator edits this. Status: TODO, IN PROGRESS, BLOCKED, DONE, SKIPPED. Order within a phase is the order of work.
 
-**Current phase: 1 (not started)**
+**Current phase: 1 (complete — pending review)**
 
 ## Phase 1: Foundation
 
 | ID | Task | Status | Commit | Evidence / notes |
 |---|---|---|---|---|
-| F1 | Testable backend and API tests | TODO | | |
-| F3 | Remove leftover files | TODO | | |
-| F2 | CI checks | TODO | | |
-| B2 | Validation and error handling | TODO | | |
-| B1 | Rate limits | TODO | | |
-| B3 | Session revocation | TODO | | |
-| B6 | Remove whiteboard file fallback | TODO | | |
-| D1 | Deployment setup and guide | TODO | | |
+| F1 | Testable backend and API tests | DONE | e8a6d42 | `npm test` 33/33 pass; `tsc` 0 err; `vitest` 63/63; `eslint` 94 err / 64 warn (158) |
+| F3 | Remove leftover files | DONE | ebaba52 | 23 leftover files deleted; `npm test` 33/33; `tsc` 0 err; `vitest` 63/63; `eslint` 158 |
+| F2 | CI checks | DONE | ce23146 | `.github/workflows/ci.yml` added; Node 24, `npm test` 33/33, `tsc`, `vitest` 63/63, lint ceiling 94/64 |
+| B2 | Validation and error handling | DONE | ab84b38 | `zod` validation, 404 UUID/delete checks, central 500 handler; `npm test` 37/37 |
+| B1 | Rate limits | DONE | 37d6155 | `express-rate-limit` (auth/AI/general), `trust proxy`, 429 UI handling; `npm test` 42/42 |
+| B3 | Session revocation | DONE | 387280a | `token_version` migration, JWT `tv`, middleware/reset/password bump, 401 redirect; `npm test` 44/44 |
+| B6 | Remove whiteboard file fallback | DONE | a380b0d | Local fallback removed, 500 via error handler, editor retry UI; `npm test` 45/45 |
+| D1 | Deployment setup and guide | DONE | e7039f5 | `vercel.json` rewrite, `API_BASE` `??`, `DEPLOY.md`; `vitest` 66/66; `eslint` 156 |
 
 ## Phase 2: Promised features
 
