@@ -1,6 +1,16 @@
 const express = require("express");
 const multer = require("multer");
 const authMiddleware = require("../middleware/auth");
+const validate = require("../middleware/validate");
+const {
+  attendanceAlertSchema,
+  chatSchema,
+  notesSchema,
+  quizGenerateSchema,
+  gradeShortAnswerSchema,
+  toolParamsSchema,
+  toolBodySchema,
+} = require("../schemas/ai");
 const {
   getStudyTip,
   attendanceAlert,
@@ -77,84 +87,67 @@ router.get("/tip", async (req, res) => {
   }
 });
 
-router.post("/attendance-alert", authMiddleware, async (req, res) => {
+router.post("/attendance-alert", authMiddleware, validate({ body: attendanceAlertSchema }), async (req, res, next) => {
   try {
     const { subject, total, attended, threshold } = req.body;
-
-    if (!subject || total === undefined || attended === undefined) {
-      return res.status(400).json({ message: "Subject, total, and attended are required" });
-    }
-
     const result = await attendanceAlert(subject, total, attended, threshold);
     res.json(result);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 });
 
-router.post("/chat", authMiddleware, async (req, res) => {
+router.post("/chat", authMiddleware, validate({ body: chatSchema }), async (req, res, next) => {
   try {
     const { messages } = req.body;
-    if (!messages || !Array.isArray(messages)) {
-      return res.status(400).json({ message: "Messages array is required" });
-    }
     const reply = await chatResponse(messages);
     res.json({ reply });
   } catch (error) {
-    res.status(error.status || 500).json({ message: error.message });
+    next(error);
   }
 });
 
-router.post("/flashcards", authMiddleware, async (req, res) => {
+router.post("/flashcards", authMiddleware, validate({ body: notesSchema }), async (req, res, next) => {
   try {
     const { notes } = req.body;
-    if (!notes) {
-      return res.status(400).json({ message: "Notes content is required" });
-    }
     const flashcards = await generateFlashcards(notes);
     res.json({ flashcards });
   } catch (error) {
-    res.status(error.status || 500).json({ message: error.message || "Failed to generate flashcards" });
+    next(error);
   }
 });
 
-router.post("/quiz", authMiddleware, async (req, res) => {
+router.post("/quiz", authMiddleware, validate({ body: quizGenerateSchema }), async (req, res, next) => {
   try {
     const { notes, count, type } = req.body;
-    if (!notes) {
-      return res.status(400).json({ message: "Notes content is required" });
-    }
     const questions = await generateQuiz(notes, count, type || "mcq");
     res.json({ questions });
   } catch (error) {
-    res.status(error.status || 500).json({ message: error.message || "Failed to generate quiz" });
+    next(error);
   }
 });
 
-router.post("/grade-short-answer", authMiddleware, async (req, res) => {
+router.post("/grade-short-answer", authMiddleware, validate({ body: gradeShortAnswerSchema }), async (req, res, next) => {
   try {
     const { question, modelAnswer, userAnswer } = req.body;
-    if (!question || !modelAnswer || userAnswer === undefined) {
-      return res.status(400).json({ message: "Question, modelAnswer, and userAnswer are required" });
-    }
     const result = await gradeShortAnswer(question, modelAnswer, userAnswer);
     res.json(result);
   } catch (error) {
-    res.status(error.status || 500).json({ message: error.message || "Failed to grade short answer response" });
+    next(error);
   }
 });
 
-router.post("/tool/:toolSlug", authMiddleware, async (req, res) => {
+router.post("/tool/:toolSlug", authMiddleware, validate({ params: toolParamsSchema, body: toolBodySchema }), async (req, res, next) => {
   try {
     const { toolSlug } = req.params;
     const { content, options } = req.body;
     if (!content && toolSlug !== 'study-schedule') {
-      return res.status(400).json({ message: "Content input is required" });
+      return res.status(400).json({ message: "content: Content input is required" });
     }
     const result = await executeSmartTool(toolSlug, content, options);
     res.json({ result });
   } catch (error) {
-    res.status(error.status || 500).json({ message: error.message || "Failed to execute smart tool" });
+    next(error);
   }
 });
 

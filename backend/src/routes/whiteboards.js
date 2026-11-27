@@ -1,6 +1,9 @@
 const express = require("express");
 const { getClient } = require("../services/supabase");
 const authMiddleware = require("../middleware/auth");
+const validate = require("../middleware/validate");
+const { idParamSchema } = require("../schemas/common");
+const { createWhiteboardSchema, updateWhiteboardSchema } = require("../schemas/whiteboards");
 const fs = require("fs");
 const path = require("path");
 
@@ -52,7 +55,7 @@ router.get("/", async (req, res) => {
 });
 
 // Get a single whiteboard
-router.get("/:id", async (req, res) => {
+router.get("/:id", validate({ params: idParamSchema }), async (req, res) => {
   try {
     const { data: whiteboard, error } = await getClient()
       .from("whiteboards")
@@ -78,7 +81,7 @@ router.get("/:id", async (req, res) => {
 });
 
 // Create a new whiteboard
-router.post("/", async (req, res) => {
+router.post("/", validate({ body: createWhiteboardSchema }), async (req, res) => {
   try {
     const { title, data, thumbnail } = req.body;
     const { data: whiteboard, error } = await getClient()
@@ -113,7 +116,7 @@ router.post("/", async (req, res) => {
 });
 
 // Update a whiteboard (save data, rename title, etc.)
-router.put("/:id", async (req, res) => {
+router.put("/:id", validate({ params: idParamSchema, body: updateWhiteboardSchema }), async (req, res) => {
   try {
     const { title, data, thumbnail } = req.body;
     
@@ -153,20 +156,28 @@ router.put("/:id", async (req, res) => {
 });
 
 // Delete a whiteboard
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", validate({ params: idParamSchema }), async (req, res) => {
   try {
-    const { error } = await getClient()
+    const { data, error } = await getClient()
       .from("whiteboards")
       .delete()
       .eq("id", req.params.id)
-      .eq("student_id", req.student.id);
+      .eq("student_id", req.student.id)
+      .select("id");
 
     if (error) throw error;
+    if (!data || data.length === 0) {
+      return res.status(404).json({ message: "Whiteboard not found" });
+    }
     res.json({ message: "Whiteboard deleted successfully" });
   } catch (dbErr) {
     console.warn("Supabase delete failed, falling back to local storage file:", dbErr.message);
     const db = readLocalDb();
+    const beforeLen = db.whiteboards.length;
     const filtered = db.whiteboards.filter(w => !(w.id === req.params.id && w.student_id === req.student.id));
+    if (filtered.length === beforeLen) {
+      return res.status(404).json({ message: "Whiteboard not found" });
+    }
     db.whiteboards = filtered;
     writeLocalDb(db);
     res.json({ message: "Whiteboard deleted successfully" });

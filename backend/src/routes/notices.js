@@ -1,13 +1,16 @@
 const express = require("express");
 const { getClient } = require("../services/supabase");
 const authMiddleware = require("../middleware/auth");
+const validate = require("../middleware/validate");
+const { idParamSchema } = require("../schemas/common");
+const { noticeBodySchema } = require("../schemas/notices");
 const { summarizeNotice } = require("../services/groq");
 
 const router = express.Router();
 
 router.use(authMiddleware);
 
-router.get("/", async (req, res) => {
+router.get("/", async (req, res, next) => {
   try {
     const { data: notices, error } = await getClient()
       .from("notices")
@@ -18,17 +21,13 @@ router.get("/", async (req, res) => {
     if (error) throw error;
     res.json({ notices });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 });
 
-router.post("/", async (req, res) => {
+router.post("/", validate({ body: noticeBodySchema }), async (req, res, next) => {
   try {
     const { notice_text, event_title, event_date } = req.body;
-
-    if (!notice_text) {
-      return res.status(400).json({ message: "Notice text is required" });
-    }
 
     const ai_summary = await summarizeNotice(notice_text);
 
@@ -47,16 +46,13 @@ router.post("/", async (req, res) => {
     if (error) throw error;
     res.json({ notice });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 });
 
-router.put("/:id", async (req, res) => {
+router.put("/:id", validate({ params: idParamSchema, body: noticeBodySchema }), async (req, res, next) => {
   try {
     const { notice_text, event_title, event_date } = req.body;
-    if (typeof notice_text !== "string" || !notice_text.trim()) {
-      return res.status(400).json({ message: "Notice text is required" });
-    }
 
     const { data: existing } = await getClient()
       .from("notices")
@@ -81,11 +77,11 @@ router.put("/:id", async (req, res) => {
     if (error) throw error;
     res.json({ notice });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 });
 
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", validate({ params: idParamSchema }), async (req, res, next) => {
   try {
     const { data, error } = await getClient()
       .from("notices")
@@ -95,10 +91,10 @@ router.delete("/:id", async (req, res) => {
       .select("id");
 
     if (error) throw error;
-    if (!data.length) return res.status(404).json({ message: "Notice not found" });
+    if (!data || data.length === 0) return res.status(404).json({ message: "Notice not found" });
     res.json({ message: "Notice deleted" });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 });
 

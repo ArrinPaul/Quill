@@ -1,6 +1,8 @@
 const express = require("express");
 const { getClient } = require("../services/supabase");
 const authMiddleware = require("../middleware/auth");
+const validate = require("../middleware/validate");
+const { focusSchema } = require("../schemas/activity");
 
 const router = express.Router();
 router.use(authMiddleware);
@@ -12,7 +14,7 @@ const getLocalDateString = () => {
   return d.toISOString().split("T")[0];
 };
 
-router.post("/ping", async (req, res) => {
+router.post("/ping", async (req, res, next) => {
   try {
     const supabase = getClient();
     const studentId = req.student.id;
@@ -69,16 +71,13 @@ router.post("/ping", async (req, res) => {
 
     res.json({ streak: currentStreak });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 });
 
-router.post("/focus", async (req, res) => {
+router.post("/focus", validate({ body: focusSchema }), async (req, res, next) => {
   try {
     const { minutes } = req.body;
-    if (typeof minutes !== 'number' || minutes <= 0) {
-      return res.status(400).json({ message: "Valid minutes are required" });
-    }
 
     const supabase = getClient();
     const studentId = req.student.id;
@@ -111,11 +110,11 @@ router.post("/focus", async (req, res) => {
 
     res.json({ total_focus_minutes: settings.total_focus_minutes });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 });
 
-router.get("/stats", async (req, res) => {
+router.get("/stats", async (req, res, next) => {
   try {
     const supabase = getClient();
     const studentId = req.student.id;
@@ -140,7 +139,7 @@ router.get("/stats", async (req, res) => {
       totalHours: totalHours
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 });
 

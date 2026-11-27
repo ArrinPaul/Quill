@@ -1,6 +1,8 @@
 const crypto = require("crypto");
 const express = require("express");
 const authMiddleware = require("../middleware/auth");
+const validate = require("../middleware/validate");
+const { studentIdParamSchema } = require("../schemas/calendar");
 const { getClient } = require("../services/supabase");
 
 const router = express.Router();
@@ -33,7 +35,7 @@ function formatIcsDate(dateString) {
 
 // GET /api/calendar/feed/:student_id
 // Generates an iCal (.ics) feed that users can subscribe to in Google/Apple Calendar without OAuth
-router.get("/feed/:student_id", async (req, res) => {
+router.get("/feed/:student_id", validate({ params: studentIdParamSchema }), async (req, res, next) => {
   try {
     const { student_id } = req.params;
     const given = Buffer.from(String(req.query.token || ""));
@@ -120,8 +122,7 @@ router.get("/feed/:student_id", async (req, res) => {
     res.setHeader("Content-Disposition", `attachment; filename="quill-calendar.ics"`);
     res.send(icsLines.join("\r\n"));
   } catch (error) {
-    console.error("Calendar feed error:", error.message);
-    res.status(500).send("Error generating calendar feed");
+    next(error);
   }
 });
 

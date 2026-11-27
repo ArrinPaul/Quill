@@ -1,12 +1,15 @@
 const express = require("express");
 const { getClient } = require("../services/supabase");
 const authMiddleware = require("../middleware/auth");
+const validate = require("../middleware/validate");
+const { idParamSchema } = require("../schemas/common");
+const { createTaskSchema, updateTaskSchema } = require("../schemas/tasks");
 
 const router = express.Router();
 
 router.use(authMiddleware);
 
-router.get("/", async (req, res) => {
+router.get("/", async (req, res, next) => {
   try {
     const { data: tasks, error } = await getClient()
       .from("tasks")
@@ -17,11 +20,11 @@ router.get("/", async (req, res) => {
     if (error) throw error;
     res.json({ tasks });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 });
 
-router.get("/today", async (req, res) => {
+router.get("/today", async (req, res, next) => {
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -39,11 +42,11 @@ router.get("/today", async (req, res) => {
     if (error) throw error;
     res.json({ tasks });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 });
 
-router.get("/upcoming", async (req, res) => {
+router.get("/upcoming", async (req, res, next) => {
   try {
     const now = new Date();
     const nextWeek = new Date(now);
@@ -60,17 +63,13 @@ router.get("/upcoming", async (req, res) => {
     if (error) throw error;
     res.json({ tasks });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 });
 
-router.post("/", async (req, res) => {
+router.post("/", validate({ body: createTaskSchema }), async (req, res, next) => {
   try {
     const { title, subject, description, deadline, reminder_time, add_to_calendar } = req.body;
-
-    if (!title?.trim() || !subject?.trim() || !deadline || Number.isNaN(Date.parse(deadline))) {
-      return res.status(400).json({ message: "Title, subject, and deadline are required" });
-    }
 
     const reminder = reminder_time || new Date(new Date(deadline).getTime() - 86400000).toISOString();
 
@@ -92,17 +91,13 @@ router.post("/", async (req, res) => {
 
     res.json({ task });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 });
 
-router.put("/:id", async (req, res) => {
+router.put("/:id", validate({ params: idParamSchema, body: updateTaskSchema }), async (req, res, next) => {
   try {
     const { title, subject, description, deadline, reminder_time, status } = req.body;
-
-    if ((title !== undefined && !title?.trim()) || (subject !== undefined && !subject?.trim())) {
-      return res.status(400).json({ message: "Title and subject cannot be blank" });
-    }
 
     const updatePayload = { title, subject, description, deadline, status };
     if (status !== undefined) {
@@ -125,27 +120,30 @@ router.put("/:id", async (req, res) => {
       .eq("id", req.params.id)
       .eq("student_id", req.student.id)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
+    if (!task) return res.status(404).json({ message: "Task not found" });
     res.json({ task });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 });
 
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", validate({ params: idParamSchema }), async (req, res, next) => {
   try {
-    const { error } = await getClient()
+    const { data, error } = await getClient()
       .from("tasks")
       .delete()
       .eq("id", req.params.id)
-      .eq("student_id", req.student.id);
+      .eq("student_id", req.student.id)
+      .select("id");
 
     if (error) throw error;
+    if (!data || data.length === 0) return res.status(404).json({ message: "Task not found" });
     res.json({ message: "Task deleted" });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 });
 

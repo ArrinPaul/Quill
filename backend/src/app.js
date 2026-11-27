@@ -34,8 +34,12 @@ app.use("/api/flashcards", flashcardsRoutes);
 app.use("/api/achievements", achievementsRoutes);
 app.use("/api/activity", activityRoutes);
 
+const errorHandler = require("./middleware/errors");
+
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
+
+app.use(errorHandler);
 
 module.exports = app;
