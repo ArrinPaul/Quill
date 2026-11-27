@@ -47,7 +47,7 @@ export function WhiteboardCanvas({ whiteboardId, title, onBack }: WhiteboardCanv
   }, [whiteboardId]);
 
   // Debounced auto-save (3 seconds delay)
-  const saveStatus = useAutoSave(
+  const { saveStatus, retry: retrySave } = useAutoSave(
     loadedId === whiteboardId ? whiteboardId : null,
     engine.shapes,
     engine.viewport,
@@ -118,28 +118,39 @@ export function WhiteboardCanvas({ whiteboardId, title, onBack }: WhiteboardCanv
           
           {/* Cloud Auto-save indicator */}
           {whiteboardId && (
-            <div className="flex items-center gap-1 text-xs text-muted-foreground ml-4 bg-muted px-2 py-0.5 rounded-[10px] font-medium">
+            <div
+              role="status"
+              aria-live="polite"
+              className="flex items-center gap-1 text-xs text-muted-foreground ml-4 bg-muted px-2 py-0.5 rounded-[10px] font-medium"
+            >
               {saveStatus === 'saving' && (
                 <>
-                  <RefreshCw className="w-3 h-3 animate-spin text-primary" />
+                  <RefreshCw className="w-3 h-3 animate-spin text-primary" aria-hidden="true" />
                   <span>Saving...</span>
                 </>
               )}
               {saveStatus === 'saved' && (
                 <>
-                  <Cloud className="w-3 h-3 text-green-500" />
-                  <span className="text-green-600">Saved to Cloud</span>
+                  <Cloud className="w-3 h-3 text-green-500" aria-hidden="true" />
+                  <span className="text-green-600 dark:text-green-400">Saved to Cloud</span>
                 </>
               )}
               {saveStatus === 'error' && (
                 <>
-                  <CloudRain className="w-3 h-3 text-destructive" />
-                  <span className="text-destructive">Save Error</span>
+                  <CloudRain className="w-3 h-3 text-destructive" aria-hidden="true" />
+                  <span className="text-destructive">Could not save</span>
+                  <button
+                    type="button"
+                    onClick={retrySave}
+                    className="ml-1.5 px-1.5 py-0.5 rounded-[6px] bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors cursor-pointer"
+                  >
+                    Retry
+                  </button>
                 </>
               )}
               {saveStatus === 'idle' && (
                 <>
-                  <Cloud className="w-3 h-3 text-muted-foreground" />
+                  <Cloud className="w-3 h-3 text-muted-foreground" aria-hidden="true" />
                   <span>Synced</span>
                 </>
               )}

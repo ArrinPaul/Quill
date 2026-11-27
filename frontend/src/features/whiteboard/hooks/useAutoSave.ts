@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { Shape, Viewport } from '../lib/shapes';
 import { Layer } from './useCanvasEngine';
 import { api } from '@/lib/api';
@@ -14,6 +14,28 @@ export function useAutoSave(
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isInitial = useRef(true);
   const pendingSave = useRef<(() => Promise<void>) | null>(null);
+  const latestStateRef = useRef({ whiteboardId, shapes, viewport, layers, title });
+
+  useEffect(() => {
+    latestStateRef.current = { whiteboardId, shapes, viewport, layers, title };
+  }, [whiteboardId, shapes, viewport, layers, title]);
+
+  const performSave = useCallback(async () => {
+    const { whiteboardId: id, shapes: s, viewport: v, layers: l, title: t } = latestStateRef.current;
+    if (!id) return;
+    pendingSave.current = null;
+    setSaveStatus('saving');
+    try {
+      await api.put(`/api/whiteboards/${id}`, {
+        title: t,
+        data: { shapes: s, viewport: v, layers: l },
+      });
+      setSaveStatus('saved');
+    } catch (err) {
+      console.error('Failed to auto-save whiteboard:', err);
+      setSaveStatus('error');
+    }
+  }, []);
 
   // Flush an unsaved change when the editor closes or switches boards
   useEffect(() => () => { void pendingSave.current?.(); }, [whiteboardId]);
@@ -35,26 +57,20 @@ export function useAutoSave(
 
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
 
-    const save = async () => {
-      pendingSave.current = null;
-      try {
-        await api.put(`/api/whiteboards/${whiteboardId}`, {
-          title,
-          data: { shapes, viewport, layers }
-        });
-        setSaveStatus('saved');
-      } catch (err) {
-        console.error('Failed to auto-save whiteboard:', err);
-        setSaveStatus('error');
-      }
-    };
-    pendingSave.current = save;
-    timeoutRef.current = setTimeout(save, 3000);
+    pendingSave.current = performSave;
+    timeoutRef.current = setTimeout(() => {
+      void performSave();
+    }, 3000);
 
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-  }, [shapes, viewport, layers, title, whiteboardId]);
+  }, [shapes, viewport, layers, title, whiteboardId, performSave]);
 
-  return saveStatus;
+  const retry = useCallback(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    void performSave();
+  }, [performSave]);
+
+  return { saveStatus, retry };
 }
