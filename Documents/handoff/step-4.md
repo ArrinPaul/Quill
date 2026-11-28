@@ -38,6 +38,13 @@ lockfile hashes were compared against registry metadata. `@dnd-kit/sortable` was
 - **Recap:** dashboard shows overdue, today, next three, low attendance, cards due. Closing hides it until tomorrow.
 - **Workload:** 3 open tasks on a day, or 6 in a Monday to Sunday week, shows a warning.
 
+## 5b. Review fixes (CodeRabbit, PR 5)
+
+Search is literal (regex match, checked read-only against Supabase), one board move per task at a time,
+the task form is remounted per task and traps Tab, the palette restores focus, stale calendar loads are
+ignored, `?open` waits for a successful load, and an unknown flashcard count is no longer shown as 0.
+The interface fixes passed type check, tests and build but were not clicked through in a browser.
+
 ## 6. Not verified, and limits
 
 - Keyboard use inside the palette (arrows, Enter, Escape). The test browser blocks key events before they reach React.

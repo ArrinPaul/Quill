@@ -178,7 +178,7 @@ export function NotesWorkspace() {
     }
   };
 
-  useQueryAction("open", !loadingList, (id) => void openNote(id));
+  useQueryAction("open", !loadingList && !listError, (id) => void openNote(id));
   useQueryAction("new", !loadingList, () => void handleCreateNote());
 
   const handleDeleteNote = async (id: string) => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Command } from "cmdk";
 import { api } from "@/lib/api";
@@ -43,6 +43,20 @@ export function CommandPalette() {
   const [query, setQuery] = useState("");
   // Results are kept with the text that produced them, so older answers are never shown.
   const [found, setFound] = useState<{ q: string; results: SearchResult[]; error: string } | null>(null);
+
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+
+  // The palette has no trigger element, so the dialog cannot restore focus by itself.
+  useEffect(() => {
+    if (!open) return;
+    returnFocusRef.current = document.activeElement as HTMLElement | null;
+    return () => {
+      const target = returnFocusRef.current;
+      setTimeout(() => {
+        if (target?.isConnected) target.focus();
+      }, 0);
+    };
+  }, [open]);
 
   const term = query.trim();
   const searching = term.length >= 2 && term.length <= 100;

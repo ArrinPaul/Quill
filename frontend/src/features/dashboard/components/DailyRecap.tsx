@@ -48,16 +48,17 @@ function TaskLine({ label, tasks }: { label: string; tasks: Task[] }) {
 /** Today at a glance. Mounted after the dashboard has loaded its tasks and attendance. */
 export function DailyRecap({ tasks, attendance }: { tasks: Task[]; attendance: Attendance[] }) {
   const [hidden, setHidden] = useState(dismissedToday);
-  const [decks, setDecks] = useState<Decks>([]);
+  // null until loaded, "failed" if the request did not work
+  const [decks, setDecks] = useState<Decks | "failed" | null>(null);
 
   useEffect(() => {
     api
       .get<{ decks: Decks }>("/api/flashcards/decks")
       .then((res) => setDecks(res.decks || []))
-      .catch(() => setDecks([]));
+      .catch(() => setDecks("failed"));
   }, []);
 
-  const recap = buildRecap(tasks, attendance, decks);
+  const recap = buildRecap(tasks, attendance, Array.isArray(decks) ? decks : []);
 
   const dismiss = () => {
     try {
@@ -97,7 +98,8 @@ export function DailyRecap({ tasks, attendance }: { tasks: Task[]; attendance: A
                     .join(", ")}`}
             </Link>
             <Link href="/dashboard/flashcards" className="hover:underline">
-              Flashcards due: {recap.cardsDue}
+              Flashcards due:{" "}
+              {Array.isArray(decks) ? recap.cardsDue : decks === "failed" ? "unavailable" : "…"}
             </Link>
           </div>
         </section>

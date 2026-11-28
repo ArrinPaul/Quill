@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Bell01 as Bell, Loading01 as Loader2, XClose as X } from "@untitledui/icons";
 import { api } from "@/lib/api";
 import { useEscape } from "@/hooks/useEscape";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
 import type { Task, TaskImportance, TaskRepeat, TaskStatus } from "@/features/types";
 
 interface TaskModalProps {
@@ -50,6 +51,7 @@ export function TaskModal({ task, defaultDeadline, onClose, onSaved }: TaskModal
   const [submitting, setSubmitting] = useState(false);
 
   useEscape(true, onClose);
+  const dialogRef = useFocusTrap<HTMLDivElement>();
 
   const handleDeadlineChange = (value: string) => {
     const isAutomatic = !reminderTime || reminderTime === dayBefore(deadline);
@@ -94,6 +96,7 @@ export function TaskModal({ task, defaultDeadline, onClose, onSaved }: TaskModal
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="task-modal-title"

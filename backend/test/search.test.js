@@ -44,7 +44,10 @@ describe("P4 GET /api/search", () => {
     assert.equal(res.data.results.length, 5);
   });
 
-  it("treats % and _ as plain text", async () => {
+  it("treats %, _, * and regex characters as plain text", async () => {
+    for (const q of ["**", ".*", "a|b", "(("]) {
+      assert.equal((await search(userA, q)).data.results.length, 0, q);
+    }
     assert.equal((await search(userA, "0%")).data.results.length, 1);
     assert.equal((await search(userA, "%%")).data.results.length, 0);
     assert.equal((await search(userA, "__")).data.results.length, 0);

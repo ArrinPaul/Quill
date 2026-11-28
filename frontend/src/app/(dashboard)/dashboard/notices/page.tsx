@@ -13,6 +13,7 @@ export default function NoticesPage() {
   const [timelineFilter, setTimelineFilter] = useState<TimelineFilter>("upcoming");
   const [notices, setNotices] = useState<Notice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
   
   // Form input states
   const [noticeText, setNoticeText] = useState("");
@@ -63,6 +64,7 @@ export default function NoticesPage() {
     try {
       const noticesRes = await api.get<{ notices: Notice[] }>("/api/notices");
       setNotices(noticesRes.notices || []);
+      setLoaded(true);
       
       if (noticesRes.notices && noticesRes.notices.length > 0 && !activeNotice) {
         setActiveNotice(noticesRes.notices[0]);
@@ -78,9 +80,12 @@ export default function NoticesPage() {
     fetchNotices();
   }, []);
 
-  useQueryAction("open", !loading, (id) => {
+  useQueryAction("open", loaded, (id) => {
     const notice = notices.find((n) => n.id === id);
-    if (!notice) return;
+    if (!notice) {
+      setError("That notice no longer exists.");
+      return;
+    }
     setTimelineFilter("all");
     setActiveNotice(notice);
   });

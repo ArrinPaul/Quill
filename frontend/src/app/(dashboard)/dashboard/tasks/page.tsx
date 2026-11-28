@@ -22,6 +22,9 @@ function TasksContent() {
   const isBoard = useSearchParams().get("view") === "board";
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+  const [movingIds, setMovingIds] = useState<ReadonlySet<string>>(new Set());
+  const movingRef = useRef(new Set<string>());
   const [activeFilter, setActiveFilter] = useState<TaskFilter>("today");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSubject, setSelectedSubject] = useState("all");
@@ -44,6 +47,7 @@ function TasksContent() {
       const res = await api.get<{ tasks: Task[] }>("/api/tasks");
       // A task waiting out its undo window must not reappear after a refresh.
       setTasks((res.tasks || []).filter((t) => !pendingDeletesRef.current.has(t.id)));
+      setLoaded(true);
     } catch (err) {
       console.error("Failed to fetch tasks", err);
     } finally {
@@ -172,6 +176,10 @@ function TasksContent() {
   };
 
   const handleMove = async (task: Task, status: BoardStatus) => {
+    // A second move while the first is pending could be undone by the first one failing.
+    if (movingRef.current.has(task.id)) return;
+    movingRef.current.add(task.id);
+    setMovingIds(new Set(movingRef.current));
     const setStatus = (value: TaskStatus) =>
       setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status: value } : t)));
     setStatus(status);
@@ -185,6 +193,9 @@ function TasksContent() {
     } catch {
       setStatus(task.status);
       toast.error(`Could not move "${task.title}". Please try again.`);
+    } finally {
+      movingRef.current.delete(task.id);
+      setMovingIds(new Set(movingRef.current));
     }
   };
 
@@ -196,7 +207,7 @@ function TasksContent() {
   });
 
   useQueryAction("new", !loading, () => handleOpenCreateModal());
-  useQueryAction("open", !loading, (id) => {
+  useQueryAction("open", loaded, (id) => {
     const task = tasks.find((t) => t.id === id);
     if (task) handleOpenEditModal(task);
     else toast.error("That task no longer exists.");
@@ -317,7 +328,7 @@ function TasksContent() {
             <p className="text-sm text-muted-foreground">Loading tasks...</p>
           </div>
         ) : isBoard ? (
-          <TaskBoard tasks={boardTasks} onMove={handleMove} onEdit={handleOpenEditModal} />
+          <TaskBoard tasks={boardTasks} movingIds={movingIds} onMove={handleMove} onEdit={handleOpenEditModal} />
         ) : displayedTasks.length === 0 ? (
           <div className="bg-card border border-border rounded-[10px] p-12 text-center shadow-sm max-w-md mx-auto mt-10">
             <ListTodo className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
@@ -452,7 +463,7 @@ function TasksContent() {
       </div>
 
       {modal && (
-        <TaskModal task={modal.task} onClose={() => setModal(null)} onSaved={fetchTasks} />
+        <TaskModal key={modal.task?.id ?? "new"} task={modal.task} onClose={() => setModal(null)} onSaved={fetchTasks} />
       )}
 
       {undoToast && (

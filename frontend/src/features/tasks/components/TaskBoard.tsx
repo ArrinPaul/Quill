@@ -18,12 +18,22 @@ import { BOARD_COLUMNS, groupByColumn, isBoardStatus, type BoardStatus } from ".
 
 interface TaskBoardProps {
   tasks: Task[];
+  /** Tasks whose move has not been answered yet. */
+  movingIds: ReadonlySet<string>;
   onMove: (task: Task, status: BoardStatus) => void;
   onEdit: (task: Task) => void;
 }
 
-function BoardCard({ task, onMove, onEdit }: { task: Task } & Omit<TaskBoardProps, "tasks">) {
-  const { setNodeRef, listeners, transform, isDragging } = useDraggable({ id: task.id });
+function BoardCard({
+  task,
+  moving,
+  onMove,
+  onEdit,
+}: { task: Task; moving: boolean } & Pick<TaskBoardProps, "onMove" | "onEdit">) {
+  const { setNodeRef, listeners, transform, isDragging } = useDraggable({
+    id: task.id,
+    disabled: moving,
+  });
 
   return (
     <li
@@ -67,6 +77,7 @@ function BoardCard({ task, onMove, onEdit }: { task: Task } & Omit<TaskBoardProp
       <select
         aria-label={`Move ${task.title} to`}
         value={task.status}
+        disabled={moving}
         onPointerDown={(e) => e.stopPropagation()}
         onTouchStart={(e) => e.stopPropagation()}
         onChange={(e) => {
@@ -88,6 +99,7 @@ function Column({
   status,
   label,
   tasks,
+  movingIds,
   onMove,
   onEdit,
 }: { status: BoardStatus; label: string } & TaskBoardProps) {
@@ -111,7 +123,7 @@ function Column({
       ) : (
         <ul className="space-y-2">
           {tasks.map((task) => (
-            <BoardCard key={task.id} task={task} onMove={onMove} onEdit={onEdit} />
+            <BoardCard key={task.id} task={task} moving={movingIds.has(task.id)} onMove={onMove} onEdit={onEdit} />
           ))}
         </ul>
       )}
@@ -119,7 +131,7 @@ function Column({
   );
 }
 
-export function TaskBoard({ tasks, onMove, onEdit }: TaskBoardProps) {
+export function TaskBoard({ tasks, movingIds, onMove, onEdit }: TaskBoardProps) {
   // A small distance (mouse) or short hold (touch) keeps clicks and scrolling working.
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
@@ -141,6 +153,7 @@ export function TaskBoard({ tasks, onMove, onEdit }: TaskBoardProps) {
             status={c.status}
             label={c.label}
             tasks={columns[c.status]}
+            movingIds={movingIds}
             onMove={onMove}
             onEdit={onEdit}
           />

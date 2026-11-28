@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ChevronLeft,
@@ -46,13 +46,20 @@ export function CalendarView() {
   const [show, setShow] = useState({ task: true, notice: true });
   const [modal, setModal] = useState<{ task?: Task; day?: Date } | null>(null);
 
+  const latestLoadRef = useRef(0);
+
   const refresh = useCallback(() => {
+    const load = ++latestLoadRef.current;
     loadCalendar()
       .then((next) => {
+        if (load !== latestLoadRef.current) return;
         setData(next);
         setError("");
       })
-      .catch((err) => setError(err instanceof Error ? err.message : "Could not load the calendar."));
+      .catch((err) => {
+        if (load !== latestLoadRef.current) return;
+        setError(err instanceof Error ? err.message : "Could not load the calendar.");
+      });
   }, []);
 
   useEffect(refresh, [refresh]);
@@ -282,6 +289,7 @@ export function CalendarView() {
 
       {modal && (
         <TaskModal
+          key={modal.task?.id ?? "new"}
           task={modal.task}
           defaultDeadline={modal.day}
           onClose={() => setModal(null)}

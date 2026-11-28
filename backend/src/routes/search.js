@@ -19,8 +19,9 @@ const SOURCES = [
   { type: "quiz", table: "quizzes", title: "title", match: ["title"], page: "/dashboard/quiz" },
 ];
 
-/** Treat the user's text literally: % and _ are wildcards to ilike. */
-const likePattern = (q) => `%${q.replace(/[\\%_]/g, "\\$&")}%`;
+// A case-insensitive regex match with everything escaped. ilike cannot search literally,
+// because the database API also reads * as a wildcard there.
+const literalPattern = (q) => q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 function snippetFrom(text, q) {
   const flat = String(text || "").replace(/\s+/g, " ").trim();
@@ -39,7 +40,7 @@ async function searchSource(source, studentId, q) {
         .from(source.table)
         .select(columns)
         .eq("student_id", studentId)
-        .ilike(column, likePattern(q))
+        .filter(column, "imatch", literalPattern(q))
         .limit(PER_TYPE);
       if (error) throw error;
       return data || [];

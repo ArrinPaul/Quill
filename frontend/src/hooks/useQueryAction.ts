@@ -7,9 +7,8 @@ import { usePathname, useSearchParams } from "next/navigation";
  * Pass `ready: false` while the page is still loading the data the action needs.
  */
 export function useQueryAction(name: string, ready: boolean, handle: (value: string) => void) {
-  const params = useSearchParams();
   const pathname = usePathname();
-  const value = params.get(name);
+  const value = useSearchParams().get(name);
   const handleRef = useRef(handle);
 
   useEffect(() => {
@@ -18,11 +17,12 @@ export function useQueryAction(name: string, ready: boolean, handle: (value: str
 
   useEffect(() => {
     if (!ready || value === null) return;
-    const rest = new URLSearchParams(params.toString());
+    // Not from `params`: another action may have changed the address in this same pass.
+    const rest = new URLSearchParams(window.location.search);
     rest.delete(name);
     const query = rest.toString();
     // Next keeps useSearchParams in step with native history updates.
     window.history.replaceState(null, "", query ? `${pathname}?${query}` : pathname);
     handleRef.current(value);
-  }, [ready, value, name, params, pathname]);
+  }, [ready, value, name, pathname]);
 }
