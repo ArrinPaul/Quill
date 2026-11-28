@@ -2,7 +2,7 @@
 
 Only the orchestrator edits this. Status: TODO, IN PROGRESS, BLOCKED, DONE, SKIPPED. Order within a phase is the order of work.
 
-**Current phase: 5 (built and tested, except email delivery — pending review)**
+**Current phase: 6 (complete — pending review)**
 
 ## Phase 1: Foundation
 
@@ -62,12 +62,12 @@ Only the orchestrator edits this. Status: TODO, IN PROGRESS, BLOCKED, DONE, SKIP
 
 | ID | Task | Status | Commit | Evidence / notes |
 |---|---|---|---|---|
-| C1 | Remove Telegram leftovers | TODO | | |
-| C2 | Email verification | TODO | | |
-| C3 | Groups and roles | TODO | | |
-| C4 | Invites | TODO | | |
-| C5 | Block, report, remove | TODO | | |
-| C6 | Groups UI | TODO | | |
+| C1 | Remove Telegram leftovers | DONE | 49216ab | Dropped Telegram tables/cols/files, cleaned `calendar.js` & widgets; `npm test` 98/98 |
+| C2 | Email verification | DONE | d08f9cc | `email_verified_at` + `email_codes` run; `/verify/send` & `/verify`, strength meter; `npm test` 101/101 |
+| C3 | Groups and roles | DONE | 4ff0aca | `study_groups`/`members` + `join_study_group` run; `access.js`, 9 routes; `npm test` 107/107 |
+| C4 | Invites | DONE | 8762547 | `study_group_invites` + `accept_study_group_invite` run; 10/15m limit, `/join/[code]`; `npm test` 112/112 |
+| C5 | Block, report, remove | DONE | 8fa0232 | `blocks`/`reports`/`audit_log`/`bans` run; ban-aware joins; `npm test` 117/117 |
+| C6 | Groups UI | DONE | 0cd26de | Sidebar, `/dashboard/groups`, `/dashboard/groups/[id]` tabs; `vitest` 123/123, `next build` pass |
 
 ## Phase 7: Sharing
 

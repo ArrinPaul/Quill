@@ -64,6 +64,15 @@ function createFakeSupabase(initialData = {}) {
       if (record.repeat === undefined) record.repeat = "none";
       if (record.repeat_parent === undefined) record.repeat_parent = null;
     }
+    if (tableName === "study_group_members") {
+      if (record.role === undefined) record.role = "member";
+      if (record.joined_at === undefined) record.joined_at = now;
+    }
+    if (tableName === "study_group_invites") {
+      if (record.uses === undefined) record.uses = 0;
+      if (record.revoked_at === undefined) record.revoked_at = null;
+      if (record.max_uses === undefined) record.max_uses = 25;
+    }
     return record;
   }
 
@@ -232,6 +241,41 @@ function createFakeSupabase(initialData = {}) {
             }
           }
         }
+        if (tableName === "study_group_members") {
+          for (const rec of built) {
+            if (table.some((r) => r.group_id === rec.group_id && r.student_id === rec.student_id)) {
+              return {
+                data: null,
+                error: {
+                  message: 'duplicate key value violates unique constraint "study_group_members_group_id_student_id_key"',
+                  code: "23505",
+                },
+              };
+            }
+            if (rec.role === "owner" && table.some((r) => r.group_id === rec.group_id && r.role === "owner")) {
+              return {
+                data: null,
+                error: {
+                  message: 'duplicate key value violates unique constraint "idx_study_group_one_owner"',
+                  code: "23505",
+                },
+              };
+            }
+          }
+        }
+        if (tableName === "study_group_invites") {
+          for (const rec of built) {
+            if (table.some((r) => r.code_hash === rec.code_hash)) {
+              return {
+                data: null,
+                error: {
+                  message: 'duplicate key value violates unique constraint "idx_study_group_invites_code_hash"',
+                  code: "23505",
+                },
+              };
+            }
+          }
+        }
         const inserted = built.map((rec) => {
           table.push(rec);
           return rec;
@@ -275,7 +319,21 @@ function createFakeSupabase(initialData = {}) {
         const updated = [];
         for (let i = 0; i < table.length; i += 1) {
           if (matchesFilters(table[i], parsed.innerParents)) {
-            table[i] = { ...table[i], ...patch };
+            const nextRow = { ...table[i], ...patch };
+            if (
+              tableName === "study_group_members" &&
+              nextRow.role === "owner" &&
+              table.some((r, idx) => idx !== i && r.group_id === nextRow.group_id && r.role === "owner")
+            ) {
+              return {
+                data: null,
+                error: {
+                  message: 'duplicate key value violates unique constraint "idx_study_group_one_owner"',
+                  code: "23505",
+                },
+              };
+            }
+            table[i] = nextRow;
             updated.push(table[i]);
           }
         }
@@ -437,6 +495,74 @@ function createFakeSupabase(initialData = {}) {
           existing.count -= 1;
         }
         return Promise.resolve({ data: null, error: null });
+      }
+      if (fnName === "join_study_group") {
+        const { p_group, p_student } = params;
+        const groups = getTable("study_groups");
+        const members = getTable("study_group_members");
+        const bans = getTable("study_group_bans");
+        if (!groups.some((g) => g.id === p_group)) {
+          return Promise.resolve({ data: "not_found", error: null });
+        }
+        if (bans.some((b) => b.group_id === p_group && b.student_id === p_student)) {
+          return Promise.resolve({ data: "banned", error: null });
+        }
+        if (members.some((m) => m.group_id === p_group && m.student_id === p_student)) {
+          return Promise.resolve({ data: "already_member", error: null });
+        }
+        const count = members.filter((m) => m.group_id === p_group).length;
+        if (count >= 75) {
+          return Promise.resolve({ data: "full", error: null });
+        }
+        members.push({
+          id: crypto.randomUUID(),
+          group_id: p_group,
+          student_id: p_student,
+          role: "member",
+          joined_at: new Date().toISOString(),
+        });
+        return Promise.resolve({ data: "joined", error: null });
+      }
+      if (fnName === "accept_study_group_invite") {
+        const { p_code_hash, p_student } = params;
+        const invites = getTable("study_group_invites");
+        const groups = getTable("study_groups");
+        const members = getTable("study_group_members");
+
+        const invite = invites.find((i) => i.code_hash === p_code_hash);
+        if (!invite) {
+          return Promise.resolve({ data: { status: "not_found", group_id: null }, error: null });
+        }
+        if (
+          (invite.revoked_at !== null && invite.revoked_at !== undefined) ||
+          new Date(invite.expires_at).getTime() <= Date.now() ||
+          (invite.max_uses !== null && invite.max_uses !== undefined && invite.uses >= invite.max_uses)
+        ) {
+          return Promise.resolve({ data: { status: "not_found", group_id: null }, error: null });
+        }
+        if (!groups.some((g) => g.id === invite.group_id)) {
+          return Promise.resolve({ data: { status: "not_found", group_id: null }, error: null });
+        }
+        const bans = getTable("study_group_bans");
+        if (bans.some((b) => b.group_id === invite.group_id && b.student_id === p_student)) {
+          return Promise.resolve({ data: { status: "banned", group_id: invite.group_id }, error: null });
+        }
+        if (members.some((m) => m.group_id === invite.group_id && m.student_id === p_student)) {
+          return Promise.resolve({ data: { status: "already_member", group_id: invite.group_id }, error: null });
+        }
+        const count = members.filter((m) => m.group_id === invite.group_id).length;
+        if (count >= 75) {
+          return Promise.resolve({ data: { status: "full", group_id: invite.group_id }, error: null });
+        }
+        members.push({
+          id: crypto.randomUUID(),
+          group_id: invite.group_id,
+          student_id: p_student,
+          role: "member",
+          joined_at: new Date().toISOString(),
+        });
+        invite.uses = (invite.uses || 0) + 1;
+        return Promise.resolve({ data: { status: "joined", group_id: invite.group_id }, error: null });
       }
       throw new Error(`Unsupported Supabase client method: rpc(${fnName})`);
     },

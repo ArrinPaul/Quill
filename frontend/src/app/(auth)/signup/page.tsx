@@ -1,16 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { ArrowLeft, ArrowRight, Check, Eye, EyeOff } from "@untitledui/icons";
+import { PasswordStrengthMeter } from "@/features/auth/components/PasswordStrengthMeter";
+import { getSafeRedirect } from "@/features/groups/safeRedirect";
 import { api } from "@/lib/api";
 
 const branches = ["CSE", "IT", "ECE", "EEE", "ME", "CE", "Other"];
 const years = [1, 2, 3, 4];
 
-export default function SignupPage() {
+function SignupForm() {
   const { register } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const safeRedirect = getSafeRedirect(searchParams.get("redirect"));
   
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
@@ -24,21 +30,6 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
-  const passwordStrength = (() => {
-    const p = form.password;
-    if (p.length === 0) return 0;
-    let s = 0;
-    if (p.length >= 6) s++;
-    if (p.length >= 8) s++;
-    if (/[A-Z]/.test(p)) s++;
-    if (/[0-9]/.test(p)) s++;
-    if (/[^A-Za-z0-9]/.test(p)) s++;
-    return s;
-  })();
-
-  const strengthColors = ["bg-red-500", "bg-red-500", "bg-orange-500", "bg-yellow-500", "bg-emerald-500", "bg-emerald-600"];
-  const strengthLabels = ["", "Very Weak", "Weak", "Fair", "Strong", "Very Strong"];
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -56,8 +47,8 @@ export default function SignupPage() {
         setError("Passwords do not match");
         return;
       }
-      if (form.password.length < 6) {
-        setError("Password must be at least 6 characters");
+      if (form.password.length < 8) {
+        setError("Password must be at least 8 characters");
         return;
       }
 
@@ -83,7 +74,8 @@ export default function SignupPage() {
           password: form.password,
           branch: form.branch,
           year: Number(form.year),
-        }, true);
+        }, false);
+        router.push(safeRedirect);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Registration failed");
       } finally {
@@ -160,7 +152,7 @@ export default function SignupPage() {
                   value={form.password}
                   onChange={handleChange}
                   className="w-full px-3 py-1.5 pr-10 border border-border rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                  placeholder="••••••••"
+                  placeholder="At least 8 characters"
                   required
                 />
                 <button
@@ -171,21 +163,7 @@ export default function SignupPage() {
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-              {form.password.length > 0 && (
-                <div className="mt-1.5">
-                  <div className="flex gap-1 mb-0.5">
-                    {[1, 2, 3, 4, 5].map((i) => (
-                      <div
-                        key={i}
-                        className={`h-1 flex-1 rounded-full ${
-                          i <= passwordStrength ? strengthColors[passwordStrength] : "bg-muted"
-                        }`}
-                      />
-                    ))}
-                  </div>
-                  <p className="text-xs text-muted-foreground">{strengthLabels[passwordStrength]}</p>
-                </div>
-              )}
+              <PasswordStrengthMeter password={form.password} />
             </div>
 
             <div>
@@ -285,11 +263,32 @@ export default function SignupPage() {
       {step === 1 && (
         <p className="mt-4 text-center text-xs text-muted-foreground">
           Already have an account?{" "}
-          <Link href="/login" className="font-medium text-primary hover:underline">
+          <Link
+            href={
+              safeRedirect !== "/dashboard"
+                ? `/login?redirect=${encodeURIComponent(safeRedirect)}`
+                : "/login"
+            }
+            className="font-medium text-primary hover:underline"
+          >
             Sign in
           </Link>
         </p>
       )}
     </div>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="bg-card rounded-[10px] border border-border p-5 sm:p-6 shadow-sm w-full text-sm text-muted-foreground">
+          Loading...
+        </div>
+      }
+    >
+      <SignupForm />
+    </Suspense>
   );
 }

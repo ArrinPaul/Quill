@@ -14,7 +14,7 @@ const checkEmailSchema = z.object({
 const registerSchema = z.object({
   name: z.string().trim().min(1, "Required").max(LIMITS.TITLE),
   email: emailSchema,
-  password: z.string().min(6, "Must be at least 6 characters").max(LIMITS.TITLE),
+  password: z.string().min(8, "Must be at least 8 characters").max(LIMITS.TITLE),
   branch: z.string().trim().min(1, "Required").max(LIMITS.TITLE),
   year: yearSchema,
   subjects: subjectsArraySchema.optional().default([]),
@@ -34,7 +34,7 @@ const updateProfileSchema = z.object({
 
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, "Required").max(LIMITS.TITLE),
-  newPassword: z.string().min(6, "Must be at least 6 characters").max(LIMITS.TITLE),
+  newPassword: z.string().min(8, "Must be at least 8 characters").max(LIMITS.TITLE),
 });
 
 const forgotPasswordSchema = z.object({
@@ -43,7 +43,11 @@ const forgotPasswordSchema = z.object({
 
 const resetPasswordSchema = z.object({
   token: z.string().trim().min(1, "Required").max(LIMITS.DESCRIPTION),
-  newPassword: z.string().min(6, "Must be at least 6 characters").max(LIMITS.TITLE),
+  newPassword: z.string().min(8, "Must be at least 8 characters").max(LIMITS.TITLE),
+});
+
+const verifyEmailSchema = z.object({
+  code: z.string().trim().regex(/^\d{6}$/, "Must be a 6-digit code"),
 });
 
 module.exports = {
@@ -54,4 +58,5 @@ module.exports = {
   changePasswordSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
+  verifyEmailSchema,
 };

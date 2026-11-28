@@ -19,6 +19,9 @@ const jobRoutes = require("./routes/jobs");
 const reportRoutes = require("./routes/reports");
 const shareRoutes = require("./routes/share");
 const emailRoutes = require("./routes/email");
+const groupsRoutes = require("./routes/groups");
+const invitesRoutes = require("./routes/invites");
+const blocksRoutes = require("./routes/blocks");
 
 const { generalLimiter } = require("./middleware/rateLimit");
 
@@ -54,6 +57,9 @@ app.use("/api/share-links", shareRoutes.links);
 app.use("/api/public", shareRoutes.publicShare);
 app.use("/api/email-preferences", emailRoutes.preferences);
 app.use("/api/unsubscribe", emailRoutes.unsubscribe);
+app.use("/api/groups", groupsRoutes);
+app.use("/api/invites", invitesRoutes);
+app.use("/api/blocks", blocksRoutes);
 
 const errorHandler = require("./middleware/errors");
 

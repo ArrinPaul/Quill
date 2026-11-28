@@ -14,6 +14,7 @@ CREATE TABLE public.students (
   password_hash TEXT NOT NULL,
   token_version INTEGER NOT NULL DEFAULT 0,
   feed_version INTEGER NOT NULL DEFAULT 0,
+  email_verified_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -160,131 +161,6 @@ CREATE POLICY "Users can manage their own cards" ON public.flashcards
   FOR ALL USING (
     deck_id IN (SELECT id FROM public.flashcard_decks WHERE student_id = auth.uid())
   );
-
-
--- ===== sql/notifyme-migration.sql =====
--- NotifyMe tables for n8n workflow support
--- Run this migration against your Supabase project
-
--- Telegram Groups (registered via /start)
-CREATE TABLE public.telegram_groups (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  telegram_chat_id BIGINT NOT NULL UNIQUE,
-  name TEXT NOT NULL,
-  invite_link TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-CREATE INDEX idx_telegram_groups_chat_id ON public.telegram_groups(telegram_chat_id);
-
--- Group Members (students linked to telegram groups)
-CREATE TABLE public.group_members (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  group_id UUID REFERENCES public.telegram_groups(id) ON DELETE CASCADE,
-  student_id UUID REFERENCES public.students(id) ON DELETE CASCADE,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(group_id, student_id)
-);
-CREATE INDEX idx_group_members_group_id ON public.group_members(group_id);
-CREATE INDEX idx_group_members_student_id ON public.group_members(student_id);
-
--- Events (deadlines extracted by AI from teacher messages)
-CREATE TABLE public.events (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  group_id UUID REFERENCES public.telegram_groups(id) ON DELETE CASCADE,
-  title TEXT NOT NULL,
-  event_date DATE NOT NULL,
-  priority TEXT CHECK (priority IN ('High','Medium','Low')) DEFAULT 'Medium',
-  category TEXT CHECK (category IN ('Exam','Assignment','Attendance','Fee','Placement','Other')) DEFAULT 'Other',
-  raw_message TEXT,
-  source TEXT DEFAULT 'telegram',
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-CREATE INDEX idx_events_group_id ON public.events(group_id);
-CREATE INDEX idx_events_event_date ON public.events(event_date);
-
--- Reminders (auto-generated from events at 7, 3, 1 day offsets)
-CREATE TABLE public.reminders (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  event_id UUID REFERENCES public.events(id) ON DELETE CASCADE,
-  group_id UUID REFERENCES public.telegram_groups(id) ON DELETE CASCADE,
-  telegram_chat_id BIGINT NOT NULL,
-  title TEXT NOT NULL,
-  event_date DATE NOT NULL,
-  category TEXT,
-  priority TEXT,
-  days_left INTEGER NOT NULL,
-  sent BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-CREATE INDEX idx_reminders_sent ON public.reminders(sent);
-CREATE INDEX idx_reminders_event_date ON public.reminders(event_date);
-
--- Function to auto-create reminders when an event is inserted
-CREATE OR REPLACE FUNCTION create_event_reminders()
-RETURNS TRIGGER AS $$
-DECLARE
-  chat_id BIGINT;
-  offset_days INTEGER;
-BEGIN
-  -- Get the telegram_chat_id for this group
-  SELECT telegram_chat_id INTO chat_id
-  FROM public.telegram_groups
-  WHERE id = NEW.group_id;
-
-  IF chat_id IS NOT NULL THEN
-    FOREACH offset_days IN ARRAY ARRAY[7, 3, 1]
-    LOOP
-      -- Only create reminder if the event is far enough in the future
-      IF (NEW.event_date - CURRENT_DATE) >= offset_days THEN
-        INSERT INTO public.reminders (event_id, group_id, telegram_chat_id, title, event_date, category, priority, days_left)
-        VALUES (NEW.id, NEW.group_id, chat_id, NEW.title, NEW.event_date, NEW.category, NEW.priority, offset_days);
-      END IF;
-    END LOOP;
-  END IF;
-
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER trigger_create_event_reminders
-AFTER INSERT ON public.events
-FOR EACH ROW
-EXECUTE FUNCTION create_event_reminders();
-
-
--- ===== sql/reminders-migration.sql =====
--- Migration for Multi-Stage Reminders
-
--- 1. Add JSONB column to tasks to track which reminders have been sent
-ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS reminders_sent JSONB DEFAULT '{}'::jsonb;
-
--- 2. Update the trigger for group events to only generate 7-day and 1-day reminders
-CREATE OR REPLACE FUNCTION create_event_reminders()
-RETURNS TRIGGER AS $$
-DECLARE
-  chat_id BIGINT;
-  offset_days INTEGER;
-BEGIN
-  -- Get the telegram_chat_id for this group
-  SELECT telegram_chat_id INTO chat_id
-  FROM public.telegram_groups
-  WHERE id = NEW.group_id;
-
-  IF chat_id IS NOT NULL THEN
-    -- Changed from [7, 3, 1] to [7, 1] for Option B
-    FOREACH offset_days IN ARRAY ARRAY[7, 1]
-    LOOP
-      -- Only create reminder if the event is far enough in the future
-      IF (NEW.event_date - CURRENT_DATE) >= offset_days THEN
-        INSERT INTO public.reminders (event_id, group_id, telegram_chat_id, title, event_date, category, priority, days_left)
-        VALUES (NEW.id, NEW.group_id, chat_id, NEW.title, NEW.event_date, NEW.category, NEW.priority, offset_days);
-      END IF;
-    END LOOP;
-  END IF;
-
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
 
 
 -- ===== automation_logs (used by routes/calendar.js) =====
@@ -445,3 +321,276 @@ CREATE INDEX IF NOT EXISTS idx_share_links_owner ON public.share_links(owner_id,
 ALTER TABLE public.focus_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.share_links ENABLE ROW LEVEL SECURITY;
 GRANT ALL ON public.focus_sessions, public.share_links TO service_role;
+
+-- ===== C2: Email verification =====
+
+CREATE TABLE IF NOT EXISTS public.email_codes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id UUID NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
+  code_hash TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_email_codes_student_id ON public.email_codes(student_id, created_at DESC);
+
+ALTER TABLE public.email_codes ENABLE ROW LEVEL SECURITY;
+GRANT ALL ON public.email_codes TO service_role;
+
+-- ===== C3: Study groups and roles =====
+
+CREATE TABLE IF NOT EXISTS public.study_groups (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL CHECK (char_length(name) BETWEEN 3 AND 60),
+  description TEXT CHECK (description IS NULL OR char_length(description) <= 500),
+  owner_id UUID NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
+  realtime_key TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_study_groups_owner_id ON public.study_groups(owner_id);
+
+CREATE TABLE IF NOT EXISTS public.study_group_members (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  group_id UUID NOT NULL REFERENCES public.study_groups(id) ON DELETE CASCADE,
+  student_id UUID NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
+  role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('owner', 'admin', 'member')),
+  joined_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (group_id, student_id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_study_group_one_owner
+  ON public.study_group_members(group_id)
+  WHERE role = 'owner';
+CREATE INDEX IF NOT EXISTS idx_study_group_members_group_id ON public.study_group_members(group_id);
+CREATE INDEX IF NOT EXISTS idx_study_group_members_student_id ON public.study_group_members(student_id);
+
+ALTER TABLE public.study_groups ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.study_group_members ENABLE ROW LEVEL SECURITY;
+GRANT ALL ON public.study_groups, public.study_group_members TO service_role;
+
+CREATE OR REPLACE FUNCTION public.join_study_group(p_group uuid, p_student uuid)
+RETURNS text
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_count int;
+  v_exists boolean;
+  v_banned boolean;
+BEGIN
+  PERFORM 1 FROM public.study_groups WHERE id = p_group FOR UPDATE;
+  IF NOT FOUND THEN
+    RETURN 'not_found';
+  END IF;
+
+  SELECT EXISTS(
+    SELECT 1 FROM public.study_group_bans
+    WHERE group_id = p_group AND student_id = p_student
+  ) INTO v_banned;
+
+  IF v_banned THEN
+    RETURN 'banned';
+  END IF;
+
+  SELECT EXISTS(
+    SELECT 1 FROM public.study_group_members
+    WHERE group_id = p_group AND student_id = p_student
+  ) INTO v_exists;
+
+  IF v_exists THEN
+    RETURN 'already_member';
+  END IF;
+
+  SELECT count(*) INTO v_count
+  FROM public.study_group_members
+  WHERE group_id = p_group;
+
+  IF v_count >= 75 THEN
+    RETURN 'full';
+  END IF;
+
+  INSERT INTO public.study_group_members (group_id, student_id, role)
+  VALUES (p_group, p_student, 'member');
+
+  RETURN 'joined';
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.join_study_group(uuid, uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.join_study_group(uuid, uuid) TO service_role;
+
+-- C4: Study group invites and atomic 75-member invite acceptance.
+CREATE TABLE IF NOT EXISTS public.study_group_invites (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  group_id UUID NOT NULL REFERENCES public.study_groups(id) ON DELETE CASCADE,
+  code_hash TEXT NOT NULL,
+  created_by UUID NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  max_uses INT NOT NULL DEFAULT 25 CHECK (max_uses >= 1),
+  uses INT NOT NULL DEFAULT 0 CHECK (uses >= 0),
+  revoked_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_study_group_invites_code_hash
+  ON public.study_group_invites(code_hash);
+
+CREATE INDEX IF NOT EXISTS idx_study_group_invites_group_id
+  ON public.study_group_invites(group_id);
+
+CREATE INDEX IF NOT EXISTS idx_study_group_invites_created_by
+  ON public.study_group_invites(created_by);
+
+ALTER TABLE public.study_group_invites ENABLE ROW LEVEL SECURITY;
+GRANT ALL ON public.study_group_invites TO service_role;
+
+CREATE OR REPLACE FUNCTION public.accept_study_group_invite(p_code_hash text, p_student uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_invite RECORD;
+  v_count int;
+  v_exists boolean;
+  v_banned boolean;
+BEGIN
+  SELECT id, group_id, expires_at, max_uses, uses, revoked_at
+  INTO v_invite
+  FROM public.study_group_invites
+  WHERE code_hash = p_code_hash
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('status', 'not_found', 'group_id', NULL);
+  END IF;
+
+  IF v_invite.revoked_at IS NOT NULL
+     OR v_invite.expires_at <= now()
+     OR (v_invite.max_uses IS NOT NULL AND v_invite.uses >= v_invite.max_uses) THEN
+    RETURN jsonb_build_object('status', 'not_found', 'group_id', NULL);
+  END IF;
+
+  PERFORM 1 FROM public.study_groups WHERE id = v_invite.group_id FOR UPDATE;
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('status', 'not_found', 'group_id', NULL);
+  END IF;
+
+  SELECT EXISTS(
+    SELECT 1 FROM public.study_group_bans
+    WHERE group_id = v_invite.group_id AND student_id = p_student
+  ) INTO v_banned;
+
+  IF v_banned THEN
+    RETURN jsonb_build_object('status', 'banned', 'group_id', v_invite.group_id);
+  END IF;
+
+  SELECT EXISTS(
+    SELECT 1 FROM public.study_group_members
+    WHERE group_id = v_invite.group_id AND student_id = p_student
+  ) INTO v_exists;
+
+  IF v_exists THEN
+    RETURN jsonb_build_object('status', 'already_member', 'group_id', v_invite.group_id);
+  END IF;
+
+  SELECT count(*) INTO v_count
+  FROM public.study_group_members
+  WHERE group_id = v_invite.group_id;
+
+  IF v_count >= 75 THEN
+    RETURN jsonb_build_object('status', 'full', 'group_id', v_invite.group_id);
+  END IF;
+
+  INSERT INTO public.study_group_members (group_id, student_id, role)
+  VALUES (v_invite.group_id, p_student, 'member');
+
+  UPDATE public.study_group_invites
+  SET uses = uses + 1
+  WHERE id = v_invite.id;
+
+  RETURN jsonb_build_object('status', 'joined', 'group_id', v_invite.group_id);
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.accept_study_group_invite(text, uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.accept_study_group_invite(text, uuid) TO service_role;
+
+-- C5: Safety (blocks, reports, audit_log, study_group_bans)
+CREATE TABLE IF NOT EXISTS public.blocks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  blocker_id UUID NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
+  blocked_id UUID NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (blocker_id, blocked_id),
+  CHECK (blocker_id <> blocked_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_blocks_blocker_id
+  ON public.blocks(blocker_id);
+
+CREATE INDEX IF NOT EXISTS idx_blocks_blocked_id
+  ON public.blocks(blocked_id);
+
+CREATE TABLE IF NOT EXISTS public.reports (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  reporter_id UUID NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
+  group_id UUID NOT NULL REFERENCES public.study_groups(id) ON DELETE CASCADE,
+  target_type TEXT NOT NULL CHECK (target_type IN ('member', 'message', 'note', 'deck', 'board', 'quiz', 'other')),
+  target_id UUID NOT NULL,
+  reason TEXT NOT NULL CHECK (char_length(reason) BETWEEN 1 AND 500),
+  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'resolved', 'dismissed')),
+  resolved_by UUID REFERENCES public.students(id) ON DELETE SET NULL,
+  resolved_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_reports_reporter_id
+  ON public.reports(reporter_id);
+
+CREATE INDEX IF NOT EXISTS idx_reports_group_id
+  ON public.reports(group_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_reports_resolved_by
+  ON public.reports(resolved_by);
+
+CREATE TABLE IF NOT EXISTS public.audit_log (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  group_id UUID NOT NULL REFERENCES public.study_groups(id) ON DELETE CASCADE,
+  actor_id UUID REFERENCES public.students(id) ON DELETE SET NULL,
+  action TEXT NOT NULL,
+  target TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_log_group_created
+  ON public.audit_log(group_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_audit_log_actor_id
+  ON public.audit_log(actor_id);
+
+CREATE TABLE IF NOT EXISTS public.study_group_bans (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  group_id UUID NOT NULL REFERENCES public.study_groups(id) ON DELETE CASCADE,
+  student_id UUID NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
+  banned_by UUID REFERENCES public.students(id) ON DELETE SET NULL,
+  reason TEXT CHECK (reason IS NULL OR char_length(reason) <= 500),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (group_id, student_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_study_group_bans_group_id
+  ON public.study_group_bans(group_id);
+
+CREATE INDEX IF NOT EXISTS idx_study_group_bans_student_id
+  ON public.study_group_bans(student_id);
+
+CREATE INDEX IF NOT EXISTS idx_study_group_bans_banned_by
+  ON public.study_group_bans(banned_by);
+
+ALTER TABLE public.blocks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.reports ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.audit_log ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.study_group_bans ENABLE ROW LEVEL SECURITY;
+GRANT ALL ON public.blocks, public.reports, public.audit_log, public.study_group_bans TO service_role;

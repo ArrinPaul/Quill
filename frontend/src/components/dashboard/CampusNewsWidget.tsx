@@ -6,16 +6,6 @@ import { ArrowRight, Calendar, CheckCircle, File01 as Newspaper, Plus, Users01 a
 import { api } from "@/lib/api";
 import type { Notice } from "@/features/types";
 
-interface GroupEvent {
-  id: string;
-  title: string;
-  event_date?: string;
-  priority?: string;
-  raw_message: string;
-  created_at: string;
-  telegram_groups?: { name: string };
-}
-
 interface UnifiedNews {
   id: string;
   type: "notice" | "event";

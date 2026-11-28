@@ -1,12 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { Eye, EyeOff } from "@untitledui/icons";
+import { getSafeRedirect } from "@/features/groups/safeRedirect";
 
-export default function LoginPage() {
+function LoginForm() {
   const { login, devLogin } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const rawRedirect = searchParams.get("redirect");
+  const safeRedirect = getSafeRedirect(rawRedirect);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -20,12 +27,27 @@ export default function LoginPage() {
 
     try {
       await login(email, password);
+      if (safeRedirect !== "/dashboard") {
+        router.replace(safeRedirect);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
       setLoading(false);
     }
   };
+
+  const handleDevLogin = async () => {
+    await devLogin();
+    if (safeRedirect !== "/dashboard") {
+      router.replace(safeRedirect);
+    }
+  };
+
+  const signupHref =
+    safeRedirect !== "/dashboard"
+      ? `/signup?redirect=${encodeURIComponent(safeRedirect)}`
+      : "/signup";
 
   return (
     <div className="bg-card rounded-[10px] border border-border p-8 shadow-sm">
@@ -99,7 +121,7 @@ export default function LoginPage() {
       {process.env.NEXT_PUBLIC_DEV_MODE === "true" && (
         <div className="mt-4">
           <button
-            onClick={devLogin}
+            onClick={handleDevLogin}
             type="button"
             className="w-full py-2.5 bg-zinc-900 text-white rounded-full text-sm font-medium hover:bg-zinc-800 transition-standard flex items-center justify-center gap-2"
           >
@@ -110,10 +132,24 @@ export default function LoginPage() {
 
       <p className="mt-6 text-center text-sm text-muted-foreground">
         Don&apos;t have an account?{" "}
-        <Link href="/signup" className="font-medium text-primary hover:underline">
+        <Link href={signupHref} className="font-medium text-primary hover:underline">
           Sign up
         </Link>
       </p>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="bg-card rounded-[10px] border border-border p-8 shadow-sm text-sm text-muted-foreground">
+          Loading...
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }
