@@ -132,3 +132,96 @@ export interface NoteSuggestedTask {
   subject?: string;
   dueDate?: string;
 }
+
+export type GroupRole = "owner" | "admin" | "member";
+
+export interface StudyGroup {
+  id: string;
+  name: string;
+  description: string | null;
+  owner_id: string;
+  created_at: string;
+  role: GroupRole;
+  member_count: number;
+  realtime_key?: string;
+}
+
+export interface GroupMember {
+  id: string;
+  name: string;
+  branch: string;
+  year: number;
+  role: GroupRole;
+  joined_at: string;
+}
+
+export interface GroupInvite {
+  id: string;
+  group_id: string;
+  created_by: string;
+  expires_at: string;
+  max_uses: number | null;
+  uses: number;
+  revoked_at: string | null;
+  created_at: string;
+}
+
+export type GroupReportTargetType =
+  | "member"
+  | "message"
+  | "note"
+  | "deck"
+  | "board"
+  | "quiz"
+  | "other";
+
+export type GroupReportStatus = "open" | "resolved" | "dismissed";
+
+export interface GroupReport {
+  id: string;
+  reporter_id: string;
+  group_id: string;
+  target_type: GroupReportTargetType;
+  target_id: string;
+  reason: string;
+  status: GroupReportStatus;
+  resolved_by: string | null;
+  resolved_at: string | null;
+  created_at: string;
+}
+
+export interface GroupBan {
+  id: string;
+  group_id: string;
+  student_id: string;
+  banned_by: string;
+  reason: string | null;
+  created_at: string;
+  student: {
+    id: string;
+    name: string;
+    branch: string;
+    year: number;
+  } | null;
+}
+
+export interface GroupAuditEntry {
+  id: string;
+  group_id: string;
+  actor_id: string | null;
+  action: string;
+  target: string | null;
+  created_at: string;
+}
+
+export interface BlockedStudent {
+  id: string;
+  blocked_id: string;
+  created_at: string;
+  student: {
+    id: string;
+    name: string;
+    branch: string;
+    year: number;
+  } | null;
+}

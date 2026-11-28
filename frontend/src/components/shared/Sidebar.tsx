@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Announcement01 as Megaphone, PieChart01 as PieChart, Calendar, SearchMd as Search, BarChart01 as BarChart3, ChevronLeftDouble as ChevronsLeft, ChevronRightDouble as ChevronsRight, FaceSmile as Bot, File04 as FileText, GraduationHat01 as GraduationCap, HelpCircle, LayersTwo01 as Layers, LayoutGrid01 as LayoutDashboard, List as ListTodo, LogOut01 as LogOut, PenTool01 as PenTool, Settings01 as Settings, Stars01 as Sparkles } from "@untitledui/icons";
+import { Announcement01 as Megaphone, PieChart01 as PieChart, Calendar, SearchMd as Search, BarChart01 as BarChart3, ChevronLeftDouble as ChevronsLeft, ChevronRightDouble as ChevronsRight, FaceSmile as Bot, File04 as FileText, GraduationHat01 as GraduationCap, HelpCircle, LayersTwo01 as Layers, LayoutGrid01 as LayoutDashboard, List as ListTodo, LogOut01 as LogOut, PenTool01 as PenTool, Settings01 as Settings, Stars01 as Sparkles, Users01 as Users } from "@untitledui/icons";
 import { PALETTE_EVENT } from "@/components/shared/CommandPalette";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { useAuth } from "@/hooks/useAuth";
@@ -21,6 +21,7 @@ export function Sidebar({ isCollapsed, onToggle, onNavigate, hideCollapseButton 
 
   const navItems = [
     { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+    { href: "/dashboard/groups", icon: Users, label: "Groups" },
     { href: "/dashboard/ai", icon: Bot, label: "AI Assistant" },
   ];
 
