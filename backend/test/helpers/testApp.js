@@ -61,7 +61,7 @@ async function startTestServer(initialData = {}) {
     await new Promise((resolve) => server.close(resolve));
   }
 
-  return { db, request, registerStudent, close };
+  return { db, baseUrl, request, registerStudent, close };
 }
 
 module.exports = { startTestServer };

@@ -113,7 +113,7 @@ export default function DashboardPage() {
       api.get<{ tasks: Task[] }>("/api/tasks").catch(() => ({ tasks: [] })),
       api.get<{ attendance: Attendance[] }>("/api/attendance").catch(() => ({ attendance: [] }))
     ]).then(([taskRes, attRes]) => {
-      setTasks(taskRes.tasks || []);
+      setTasks((taskRes.tasks || []).filter((t) => t.status !== "cancelled"));
       setAttendance(attRes.attendance || []);
     }).finally(() => setLoading(false));
 

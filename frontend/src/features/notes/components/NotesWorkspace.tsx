@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -46,7 +46,6 @@ export function NotesWorkspace() {
 
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [version, setVersion] = useState(1);
 
   const [activeTab, setActiveTab] = useState<"write" | "preview">("write");
   const [creating, setCreating] = useState(false);
@@ -91,7 +90,6 @@ export function NotesWorkspace() {
   }, []);
 
   const handleSaved = useCallback((saved: Note) => {
-    setVersion(saved.version);
     setNotes((prev) => {
       const exists = prev.some((n) => n.id === saved.id);
       const summary: NoteSummary = {
@@ -110,38 +108,39 @@ export function NotesWorkspace() {
     });
   }, []);
 
-  const { saveStatus, retry, overwrite, syncAfterReload } = useNoteAutoSave({
+  const { saveStatus, begin, end, retry, overwrite } = useNoteAutoSave({
     noteId: activeNoteId,
     title,
     content,
-    version,
     onSaved: handleSaved,
   });
+
+  // The note the user asked for last; slower, older responses are ignored.
+  const requestedIdRef = useRef<string | null>(null);
 
   const openNote = useCallback(
     async (id: string, isReload = false) => {
       setLoadingNote(true);
       setNoteError("");
-      if (!isReload) {
-        setActiveNoteId(id);
-      }
+      requestedIdRef.current = id;
+      setActiveNoteId(id);
       try {
+        // Finish saving the note being left, so reopening it cannot show old text.
+        await end({ discard: isReload });
         const res = await api.get<{ note: Note }>(`/api/notes/${id}`);
+        if (requestedIdRef.current !== id) return;
+        begin(res.note);
         setTitle(res.note.title);
         setContent(res.note.content);
-        setVersion(res.note.version);
-        if (isReload) {
-          syncAfterReload(res.note.version);
-          toast.success("Reloaded latest note version.");
-        }
+        if (isReload) toast.success("Reloaded latest note version.");
         handleSaved(res.note);
       } catch (err) {
+        if (requestedIdRef.current !== id) return;
         setNoteError(err instanceof Error ? err.message : "Failed to load note.");
-      } finally {
-        setLoadingNote(false);
       }
+      setLoadingNote(false);
     },
-    [handleSaved, syncAfterReload]
+    [begin, end, handleSaved]
   );
 
   const handleCreateNote = async () => {
@@ -162,10 +161,14 @@ export function NotesWorkspace() {
         },
         ...prev,
       ]);
+      void end();
+      requestedIdRef.current = created.id;
+      begin(created);
+      setLoadingNote(false);
+      setNoteError("");
       setActiveNoteId(created.id);
       setTitle(created.title);
       setContent(created.content);
-      setVersion(created.version);
       setActiveTab("write");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to create note.");
@@ -179,11 +182,12 @@ export function NotesWorkspace() {
     try {
       await api.delete(`/api/notes/${id}`);
       setNotes((prev) => prev.filter((n) => n.id !== id));
-      if (activeNoteId === id) {
+      if (requestedIdRef.current === id) {
+        void end({ discard: true });
+        requestedIdRef.current = null;
         setActiveNoteId(null);
         setTitle("");
         setContent("");
-        setVersion(1);
       }
       setConfirmDeleteId(null);
       toast.success("Note deleted.");
@@ -365,7 +369,11 @@ export function NotesWorkspace() {
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                   <button
                     type="button"
-                    onClick={() => setActiveNoteId(null)}
+                    onClick={() => {
+                      void end();
+                      requestedIdRef.current = null;
+                      setActiveNoteId(null);
+                    }}
                     aria-label="Back to notes list"
                     className="md:hidden p-2 rounded-lg border border-border text-foreground hover:bg-accent cursor-pointer shrink-0"
                   >
@@ -519,6 +527,7 @@ export function NotesWorkspace() {
               {/* AI Preview Actions */}
               <div className="pt-2 border-t border-border">
                 <NoteAiPanel
+                  key={activeNoteId}
                   noteId={activeNoteId}
                   hasContent={content.trim().length > 0}
                   onReplaceContent={(text) => setContent(text)}

@@ -48,7 +48,8 @@ export default function TasksPage() {
     setLoading(true);
     try {
       const res = await api.get<{ tasks: Task[] }>("/api/tasks");
-      setTasks(res.tasks || []);
+      // A task waiting out its undo window must not reappear after a refresh.
+      setTasks((res.tasks || []).filter((t) => !pendingDeletesRef.current.has(t.id)));
     } catch (err) {
       console.error("Failed to fetch tasks", err);
     } finally {
@@ -66,7 +67,7 @@ export default function TasksPage() {
     pendingDeletesRef.current.clear();
     for (const [id, entry] of entries) {
       clearTimeout(entry.timerId);
-      void api.delete(`/api/tasks/${id}`).catch((err) => {
+      void api.delete(`/api/tasks/${id}`, { keepalive: true }).catch((err) => {
         console.error("Failed to flush task delete", err);
       });
     }
@@ -416,7 +417,7 @@ export default function TasksPage() {
               <div className="flex-1 min-w-0 space-y-1">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
-                    <h3 className={`text-base font-semibold text-foreground break-words ${task.status === "completed" ? "line-through text-muted-foreground" : ""}`}>
+                    <h3 className={`text-base font-semibold text-foreground break-words ${task.status === "completed" || task.status === "cancelled" ? "line-through text-muted-foreground" : ""}`}>
                       {task.title}
                     </h3>
                     <div className="flex flex-wrap items-center gap-2 mt-1">
@@ -478,11 +479,13 @@ export default function TasksPage() {
                       <span className={`ml-2 font-medium ${
                         task.status === "completed" 
                           ? "text-green-600" 
+                          : task.status === "cancelled"
+                            ? "text-muted-foreground"
                           : getDaysLeft(task.deadline) === "Overdue" 
                             ? "text-destructive" 
                             : "text-orange-600"
                       }`}>
-                        ({task.status === "completed" ? "Completed" : getDaysLeft(task.deadline)})
+                        ({task.status === "completed" ? "Completed" : task.status === "cancelled" ? "Cancelled" : getDaysLeft(task.deadline)})
                       </span>
                     </span>
                   </div>

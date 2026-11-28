@@ -37,7 +37,7 @@ export function ProductivityScoreWidget({ tasks = [], attendance = [] }: Product
 
   const suggestions = [];
   const completedCount = tasks.filter((t) => t.status === "completed").length;
-  const pendingCount = tasks.filter((t) => t.status === "pending").length;
+  const pendingCount = tasks.filter((t) => t.status === "pending" || t.status === "in_progress").length;
 
   if (pendingCount > 0) {
     suggestions.push(`You have ${pendingCount} pending task${pendingCount > 1 ? "s" : ""} — try to complete one today`);

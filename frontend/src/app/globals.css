@@ -240,7 +240,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* The brand red is too dim as text on dark surfaces */
-.dark :is(.text-primary, .hover:text-primary:hover) {
+.dark :is(.text-primary, .hover\:text-primary:hover) {
   color: hsl(350 75% 74%);
 }
 

@@ -172,7 +172,8 @@ router.put("/password", authMiddleware, validate({ body: changePasswordSchema })
 
     const valid = await bcrypt.compare(currentPassword, student.password_hash);
     if (!valid) {
-      return res.status(401).json({ message: "Current password is incorrect" });
+      // Not 401: the web app treats that as an expired session and signs the user out.
+      return res.status(400).json({ message: "Current password is incorrect" });
     }
 
     const password_hash = await bcrypt.hash(newPassword, 10);

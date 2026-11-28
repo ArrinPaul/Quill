@@ -33,7 +33,7 @@ export function MonthlyCalendarWidget() {
         const taskRes = await api
           .get<{ tasks: Task[] }>("/api/tasks")
           .catch(() => ({ tasks: [] }));
-        setTasks(taskRes.tasks || []);
+        setTasks((taskRes.tasks || []).filter((t) => t.status !== "cancelled"));
 
       } finally {
         setLoading(false);

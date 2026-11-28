@@ -73,7 +73,7 @@ describe("Activity log and GET /api/activity/recent", () => {
     assert.equal(noticeRes.status, 200);
     const noticeId = noticeRes.data.notice.id;
 
-    // 4. quiz_completed (create quiz, then submit twice)
+    // 4. quiz_completed (create quiz, submit, retake, submit again)
     const quizRes = await ctx.request("POST", "/api/quizzes", {
       token: userA.token,
       body: {
@@ -100,6 +100,9 @@ describe("Activity log and GET /api/activity/recent", () => {
       },
     });
     assert.equal(submit1.status, 200);
+
+    const retake = await ctx.request("POST", `/api/quizzes/${quizId}/retake`, { token: userA.token });
+    assert.equal(retake.status, 200);
 
     const submit2 = await ctx.request("PATCH", `/api/quizzes/${quizId}/submit`, {
       token: userA.token,

@@ -409,5 +409,9 @@ END $$;
 
 GRANT USAGE ON SCHEMA public TO service_role;
 GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;
+REVOKE EXECUTE ON FUNCTION public.bump_ai_usage(uuid, int) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.refund_ai_usage(uuid) FROM PUBLIC, anon, authenticated;
+ALTER FUNCTION public.bump_ai_usage(uuid, int) SET search_path = public, pg_temp;
+ALTER FUNCTION public.refund_ai_usage(uuid) SET search_path = public, pg_temp;
 GRANT EXECUTE ON FUNCTION public.bump_ai_usage(uuid, int) TO service_role;
 GRANT EXECUTE ON FUNCTION public.refund_ai_usage(uuid) TO service_role;
