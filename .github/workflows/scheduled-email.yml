@@ -1,0 +1,27 @@
+name: Scheduled email
+
+# Needs the repository variable BACKEND_URL and the secret CRON_SECRET (same value as on the server).
+on:
+  schedule:
+    - cron: "*/30 * * * *" # reminders; GitHub may run it late
+    - cron: "0 7 * * 1" # weekly digest, Mondays 07:00 UTC
+  workflow_dispatch:
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    env:
+      BACKEND_URL: ${{ vars.BACKEND_URL }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      JOB: ${{ github.event.schedule == '0 7 * * 1' && 'digest' || 'reminders' }}
+    steps:
+      - name: Call the job
+        run: |
+          if [ -z "$BACKEND_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "BACKEND_URL or CRON_SECRET is not set; nothing to do."
+            exit 0
+          fi
+          # Retries cover a sleeping free-tier server waking up.
+          curl --fail-with-body --silent --show-error --max-time 90 \
+            --retry 4 --retry-delay 20 --retry-all-errors \
+            -X POST -H "x-cron-secret: $CRON_SECRET" "$BACKEND_URL/api/jobs/$JOB"

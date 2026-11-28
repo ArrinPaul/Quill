@@ -137,6 +137,8 @@ function createFakeSupabase(initialData = {}) {
           if (actual === undefined || actual === null || actual >= f.val) return false;
         } else if (f.op === "lte") {
           if (actual === undefined || actual === null || actual > f.val) return false;
+        } else if (f.op === "is") {
+          if ((actual ?? null) !== f.val) return false;
         } else if (f.op === "imatch") {
           if (typeof actual !== "string" || !new RegExp(f.val, "i").test(actual)) return false;
         }
@@ -351,6 +353,10 @@ function createFakeSupabase(initialData = {}) {
       },
       lte(col, val) {
         state.filters.push({ op: "lte", col, val });
+        return proxy;
+      },
+      is(col, val) {
+        state.filters.push({ op: "is", col, val });
         return proxy;
       },
       filter(col, op, val) {

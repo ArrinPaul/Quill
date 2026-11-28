@@ -78,7 +78,14 @@ const generalLimiter = createLimiter({
   keyGenerator: userOrIpKey,
 });
 
+// Shared links need no login, so limit them by IP
+const publicLimiter = createLimiter({
+  windowMs: 15 * 60 * 1000,
+  limit: 60,
+});
+
 module.exports = {
+  publicLimiter,
   authIpLimiter,
   loginEmailLimiter,
   aiLimiter,
