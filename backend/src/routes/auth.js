@@ -287,10 +287,84 @@ router.post("/reset-password", authIpLimiter, validate({ body: resetPasswordSche
   }
 });
 
+async function handleStudyGroupsOnAccountDelete(supabase, studentId) {
+  const { data: ownedGroups, error: ownedError } = await supabase
+    .from("study_groups")
+    .select("id")
+    .eq("owner_id", studentId);
+  if (ownedError) throw ownedError;
+
+  for (const group of ownedGroups || []) {
+    const { data: members, error: memError } = await supabase
+      .from("study_group_members")
+      .select("student_id, role, joined_at")
+      .eq("group_id", group.id)
+      .order("joined_at", { ascending: true });
+    if (memError) throw memError;
+
+    const others = (members || []).filter((m) => m.student_id !== studentId);
+    const successor = others.find((m) => m.role === "admin") || others[0];
+
+    if (successor) {
+      const { error: delOwnerMemError } = await supabase
+        .from("study_group_members")
+        .delete()
+        .eq("group_id", group.id)
+        .eq("student_id", studentId);
+      if (delOwnerMemError) throw delOwnerMemError;
+
+      const { error: promoteError } = await supabase
+        .from("study_group_members")
+        .update({ role: "owner" })
+        .eq("group_id", group.id)
+        .eq("student_id", successor.student_id);
+      if (promoteError) throw promoteError;
+
+      const { error: updateGroupError } = await supabase
+        .from("study_groups")
+        .update({
+          owner_id: successor.student_id,
+          realtime_key: crypto.randomBytes(24).toString("hex"),
+        })
+        .eq("id", group.id);
+      if (updateGroupError) throw updateGroupError;
+    } else {
+      const { error: delGroupError } = await supabase
+        .from("study_groups")
+        .delete()
+        .eq("id", group.id);
+      if (delGroupError) throw delGroupError;
+    }
+  }
+
+  const { data: remainingMemberships, error: remError } = await supabase
+    .from("study_group_members")
+    .select("group_id")
+    .eq("student_id", studentId);
+  if (remError) throw remError;
+
+  for (const m of remainingMemberships || []) {
+    const { error: delMemError } = await supabase
+      .from("study_group_members")
+      .delete()
+      .eq("group_id", m.group_id)
+      .eq("student_id", studentId);
+    if (delMemError) throw delMemError;
+
+    const { error: rotateError } = await supabase
+      .from("study_groups")
+      .update({ realtime_key: crypto.randomBytes(24).toString("hex") })
+      .eq("id", m.group_id);
+    if (rotateError) throw rotateError;
+  }
+}
+
 router.delete("/me", authMiddleware, async (req, res, next) => {
   try {
     const supabase = getClient();
     const studentId = req.student.id;
+
+    await handleStudyGroupsOnAccountDelete(supabase, studentId);
 
     await supabase.from("preferences").delete().eq("user_id", studentId);
     await supabase.from("tasks").delete().eq("student_id", studentId);

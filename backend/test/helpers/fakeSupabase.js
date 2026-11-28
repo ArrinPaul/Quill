@@ -64,6 +64,10 @@ function createFakeSupabase(initialData = {}) {
       if (record.repeat === undefined) record.repeat = "none";
       if (record.repeat_parent === undefined) record.repeat_parent = null;
     }
+    if (tableName === "study_group_members") {
+      if (record.role === undefined) record.role = "member";
+      if (record.joined_at === undefined) record.joined_at = now;
+    }
     return record;
   }
 
@@ -232,6 +236,28 @@ function createFakeSupabase(initialData = {}) {
             }
           }
         }
+        if (tableName === "study_group_members") {
+          for (const rec of built) {
+            if (table.some((r) => r.group_id === rec.group_id && r.student_id === rec.student_id)) {
+              return {
+                data: null,
+                error: {
+                  message: 'duplicate key value violates unique constraint "study_group_members_group_id_student_id_key"',
+                  code: "23505",
+                },
+              };
+            }
+            if (rec.role === "owner" && table.some((r) => r.group_id === rec.group_id && r.role === "owner")) {
+              return {
+                data: null,
+                error: {
+                  message: 'duplicate key value violates unique constraint "idx_study_group_one_owner"',
+                  code: "23505",
+                },
+              };
+            }
+          }
+        }
         const inserted = built.map((rec) => {
           table.push(rec);
           return rec;
@@ -275,7 +301,21 @@ function createFakeSupabase(initialData = {}) {
         const updated = [];
         for (let i = 0; i < table.length; i += 1) {
           if (matchesFilters(table[i], parsed.innerParents)) {
-            table[i] = { ...table[i], ...patch };
+            const nextRow = { ...table[i], ...patch };
+            if (
+              tableName === "study_group_members" &&
+              nextRow.role === "owner" &&
+              table.some((r, idx) => idx !== i && r.group_id === nextRow.group_id && r.role === "owner")
+            ) {
+              return {
+                data: null,
+                error: {
+                  message: 'duplicate key value violates unique constraint "idx_study_group_one_owner"',
+                  code: "23505",
+                },
+              };
+            }
+            table[i] = nextRow;
             updated.push(table[i]);
           }
         }
@@ -437,6 +477,29 @@ function createFakeSupabase(initialData = {}) {
           existing.count -= 1;
         }
         return Promise.resolve({ data: null, error: null });
+      }
+      if (fnName === "join_study_group") {
+        const { p_group, p_student } = params;
+        const groups = getTable("study_groups");
+        const members = getTable("study_group_members");
+        if (!groups.some((g) => g.id === p_group)) {
+          return Promise.resolve({ data: "not_found", error: null });
+        }
+        if (members.some((m) => m.group_id === p_group && m.student_id === p_student)) {
+          return Promise.resolve({ data: "already_member", error: null });
+        }
+        const count = members.filter((m) => m.group_id === p_group).length;
+        if (count >= 75) {
+          return Promise.resolve({ data: "full", error: null });
+        }
+        members.push({
+          id: crypto.randomUUID(),
+          group_id: p_group,
+          student_id: p_student,
+          role: "member",
+          joined_at: new Date().toISOString(),
+        });
+        return Promise.resolve({ data: "joined", error: null });
       }
       throw new Error(`Unsupported Supabase client method: rpc(${fnName})`);
     },
