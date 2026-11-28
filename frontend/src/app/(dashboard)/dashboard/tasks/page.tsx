@@ -1,47 +1,41 @@
 "use client";
 
-import { useEscape } from "@/hooks/useEscape";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bell01 as Bell, Calendar, Check, Edit01 as Edit2, List as ListTodo, Loading01 as Loader2, Plus, Repeat01 as Repeat, SearchMd as Search, Trash01 as Trash2, XClose as X } from "@untitledui/icons";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { toast } from "sonner";
+import { Bell01 as Bell, Calendar, Check, Edit01 as Edit2, List as ListTodo, Loading01 as Loader2, Plus, Repeat01 as Repeat, SearchMd as Search, Trash01 as Trash2 } from "@untitledui/icons";
 import { api } from "@/lib/api";
 import { daysUntil } from "@/lib/utils";
 import { motion } from "framer-motion";
-import type { Task, TaskFilter, TaskImportance, TaskRepeat, TaskStatus } from "@/features/types";
+import type { Task, TaskFilter, TaskStatus } from "@/features/types";
 import { generateGoogleCalendarUrl } from "@/lib/calendar";
 import { sortTasksByPriority } from "@/lib/priority";
 import { PriorityBadge } from "@/features/tasks/components/PriorityBadge";
 import { usePrioritySort } from "@/features/tasks/hooks/usePrioritySort";
+import { TaskBoard } from "@/features/tasks/components/TaskBoard";
+import { TaskModal } from "@/features/tasks/components/TaskModal";
+import type { BoardStatus } from "@/features/tasks/lib/board";
+import { useQueryAction } from "@/hooks/useQueryAction";
 
-export default function TasksPage() {
+function TasksContent() {
+  const router = useRouter();
+  const isBoard = useSearchParams().get("view") === "board";
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<TaskFilter>("today");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSubject, setSelectedSubject] = useState("all");
   
-  // Modal states
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  useEscape(isModalOpen, () => setIsModalOpen(false));
-  const [isEditing, setIsEditing] = useState(false);
-  const [editId, setEditId] = useState<string | null>(null);
-  
-  // Form states
-  const [title, setTitle] = useState("");
-  const [subject, setSubject] = useState("");
-  const [description, setDescription] = useState("");
-  const [deadline, setDeadline] = useState("");
-  const [reminderTime, setReminderTime] = useState("");
-  const [importance, setImportance] = useState<TaskImportance>("normal");
-  const [status, setStatus] = useState<TaskStatus>("pending");
-  const [repeat, setRepeat] = useState<TaskRepeat>("none");
+  // null: closed. { task: null }: creating.
+  const [modal, setModal] = useState<{ task: Task | null } | null>(null);
+  const handleOpenCreateModal = () => setModal({ task: null });
+  const handleOpenEditModal = (task: Task) => setModal({ task });
+
   const { sortByPriority, toggleSortByPriority } = usePrioritySort("quill.tasks.sortByPriority");
 
   // Undo delete state
   const [undoToast, setUndoToast] = useState<{ taskId: string; title: string } | null>(null);
   const pendingDeletesRef = useRef<Map<string, { task: Task; timerId: ReturnType<typeof setTimeout> }>>(new Map());
-  
-  const [formError, setFormError] = useState("");
-  const [submitting, setSubmitting] = useState(false);
 
   // Fetch tasks
   const fetchTasks = async () => {
@@ -80,20 +74,6 @@ export default function TasksPage() {
       flushPendingDeletes();
     };
   }, [flushPendingDeletes]);
-
-  const dayBefore = (value: string) => {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return "";
-    const reminder = new Date(date.getTime() - 24 * 60 * 60 * 1000);
-    return new Date(reminder.getTime() - reminder.getTimezoneOffset() * 60 * 1000).toISOString().slice(0, 16);
-  };
-
-  const handleDeadlineChange = (value: string) => {
-    const isAutomatic = !reminderTime || reminderTime === dayBefore(deadline);
-    const reminderIsLate = !!reminderTime && !!value && reminderTime > value;
-    setDeadline(value);
-    if (isAutomatic || reminderIsLate) setReminderTime(dayBefore(value));
-  };
 
   const subjects = useMemo(
     () =>
@@ -140,89 +120,6 @@ export default function TasksPage() {
     : [...filteredTasks].sort(
         (a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
       );
-
-  const handleOpenCreateModal = () => {
-    setIsEditing(false);
-    setEditId(null);
-    setTitle("");
-    setSubject("");
-    setDescription("");
-    setDeadline("");
-    setReminderTime("");
-    setImportance("normal");
-    setStatus("pending");
-    setRepeat("none");
-    setFormError("");
-    setIsModalOpen(true);
-  };
-
-  const handleOpenEditModal = (task: Task) => {
-    setIsEditing(true);
-    setEditId(task.id);
-    setTitle(task.title);
-    setSubject(task.subject);
-    setDescription(task.description || "");
-    
-    // Format to yyyy-MM-ddThh:mm
-    const dlDate = new Date(task.deadline);
-    const dlOffset = dlDate.getTimezoneOffset();
-    const dlLocal = new Date(dlDate.getTime() - dlOffset * 60 * 1000);
-    setDeadline(dlLocal.toISOString().slice(0, 16));
-
-    if (task.reminder_time) {
-      const remDate = new Date(task.reminder_time);
-      const remOffset = remDate.getTimezoneOffset();
-      const remLocal = new Date(remDate.getTime() - remOffset * 60 * 1000);
-      setReminderTime(remLocal.toISOString().slice(0, 16));
-    } else {
-      setReminderTime("");
-    }
-    setImportance(task.importance ?? "normal");
-    setStatus(task.status);
-    setRepeat(task.repeat ?? "none");
-    setFormError("");
-    setIsModalOpen(true);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormError("");
-    
-    if (!title.trim() || !subject.trim() || !deadline) {
-      setFormError("Title, Subject and Deadline are required");
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      const deadlineISO = new Date(deadline).toISOString();
-      const reminderISO = reminderTime ? new Date(reminderTime).toISOString() : new Date(new Date(deadline).getTime() - 24 * 60 * 60 * 1000).toISOString();
-
-      const payload = {
-        title,
-        subject,
-        description: description || null,
-        deadline: deadlineISO,
-        reminder_time: reminderISO,
-        importance,
-        status,
-        repeat,
-      };
-
-      if (isEditing && editId) {
-        await api.put(`/api/tasks/${editId}`, payload);
-      } else {
-        await api.post("/api/tasks", payload);
-      }
-      
-      setIsModalOpen(false);
-      fetchTasks();
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Failed to save task");
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   const handleDelete = (task: Task) => {
     const existing = pendingDeletesRef.current.get(task.id);
@@ -274,6 +171,37 @@ export default function TasksPage() {
     }
   };
 
+  const handleMove = async (task: Task, status: BoardStatus) => {
+    const setStatus = (value: TaskStatus) =>
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status: value } : t)));
+    setStatus(status);
+    try {
+      const res = await api.put<{ task: Task; nextTask?: Task }>(`/api/tasks/${task.id}`, { status });
+      setTasks((prev) => {
+        const mapped = prev.map((t) => (t.id === task.id ? res.task : t));
+        const next = res.nextTask;
+        return next && !mapped.some((t) => t.id === next.id) ? [...mapped, next] : mapped;
+      });
+    } catch {
+      setStatus(task.status);
+      toast.error(`Could not move "${task.title}". Please try again.`);
+    }
+  };
+
+  // The board has its own status columns, so only search and subject narrow it.
+  const boardTasks = tasks.filter((task) => {
+    if (selectedSubject !== "all" && task.subject !== selectedSubject) return false;
+    const q = searchQuery.trim().toLowerCase();
+    return !q || task.title.toLowerCase().includes(q) || task.subject.toLowerCase().includes(q);
+  });
+
+  useQueryAction("new", !loading, () => handleOpenCreateModal());
+  useQueryAction("open", !loading, (id) => {
+    const task = tasks.find((t) => t.id === id);
+    if (task) handleOpenEditModal(task);
+    else toast.error("That task no longer exists.");
+  });
+
   const getDaysLeft = (deadlineStr: string) => {
     const days = daysUntil(deadlineStr);
     
@@ -287,19 +215,34 @@ export default function TasksPage() {
     <div className="max-w-7xl mx-auto h-[calc(100vh-6rem)] flex flex-col">
       <div className="flex items-center justify-between flex-shrink-0 mb-6">
         <h1 className="text-2xl font-bold text-foreground">Tasks</h1>
-        <button 
+        <div className="flex items-center gap-2">
+          <div role="group" aria-label="Task view" className="flex rounded-[10px] border border-border bg-card p-0.5">
+            {([false, true] as const).map((board) => (
+              <button
+                key={String(board)}
+                type="button"
+                aria-pressed={isBoard === board}
+                onClick={() => router.replace(board ? "/dashboard/tasks?view=board" : "/dashboard/tasks", { scroll: false })}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-[8px] cursor-pointer ${isBoard === board ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                {board ? "Board" : "List"}
+              </button>
+            ))}
+          </div>
+        <button
           onClick={handleOpenCreateModal}
           className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground font-medium rounded-[10px] hover:opacity-90 transition-standard cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           New Task
         </button>
+        </div>
       </div>
 
       {/* Filter Tabs & Controls */}
       <div className="flex flex-col gap-3 border-b border-border pb-3 mb-4 flex-shrink-0">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap gap-3 relative">
+          <div className={`flex-wrap gap-3 relative ${isBoard ? "hidden" : "flex"}`}>
             {(["today", "upcoming", "in_progress", "completed", "all"] as const).map((filter) => {
               const isActive = activeFilter === filter;
               const label = filter === "in_progress" ? "In progress" : filter;
@@ -340,6 +283,7 @@ export default function TasksPage() {
               ))}
             </select>
             <select
+              hidden={isBoard}
               aria-label="Sort tasks"
               value={sortByPriority ? "priority" : "deadline"}
               onChange={(e) => {
@@ -372,6 +316,8 @@ export default function TasksPage() {
             <Loader2 className="w-8 h-8 text-primary animate-spin mb-2" />
             <p className="text-sm text-muted-foreground">Loading tasks...</p>
           </div>
+        ) : isBoard ? (
+          <TaskBoard tasks={boardTasks} onMove={handleMove} onEdit={handleOpenEditModal} />
         ) : displayedTasks.length === 0 ? (
           <div className="bg-card border border-border rounded-[10px] p-12 text-center shadow-sm max-w-md mx-auto mt-10">
             <ListTodo className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
@@ -505,188 +451,8 @@ export default function TasksPage() {
       )}
       </div>
 
-      {/* Task Form Modal */}
-      {isModalOpen && (
-        <div role="dialog" aria-modal="true"
-          className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-in fade-in zoom-in-95 duration-200"
-          onClick={() => setIsModalOpen(false)}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            className="bg-card rounded-[24px] border border-foreground/5 shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto overflow-x-hidden flex flex-col relative"
-            onClick={(e) => e.stopPropagation()}
-          >
-            
-            {/* Header */}
-            <div className="flex items-center justify-between p-6 pb-4 border-b border-foreground/5 bg-gradient-to-r from-primary/5 to-transparent">
-              <div>
-                <h2 className="text-xl font-bold tracking-tight text-foreground">
-                  {isEditing ? "Edit Task" : "Create New Task"}
-                </h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {isEditing ? "Update your task details below." : "Add a new assignment or deadline."}
-                </p>
-              </div>
-              <button 
-                type="button"
-                aria-label="Close task modal"
-                onClick={() => setIsModalOpen(false)}
-                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-foreground/5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-6">
-              {formError && (
-                <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-[16px] text-sm text-destructive flex items-center gap-2 shadow-sm">
-                  <div className="w-2 h-2 rounded-full bg-destructive flex-shrink-0 animate-pulse" />
-                  {formError}
-                </div>
-              )}
-
-              <form onSubmit={handleSubmit} className="space-y-5">
-                <div>
-                  <label className="block text-sm font-semibold text-foreground/80 mb-2">
-                    Title <span className="text-destructive">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    className="w-full px-4 py-3 bg-muted/30 border border-foreground/10 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all placeholder:text-muted-foreground/60 shadow-sm"
-                    placeholder="e.g., DBMS Assignment 2"
-                    required
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                  <div>
-                    <label className="block text-sm font-semibold text-foreground/80 mb-2">
-                      Subject / Category <span className="text-destructive">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={subject}
-                      onChange={(e) => setSubject(e.target.value)}
-                      className="w-full px-4 py-3 bg-muted/30 border border-foreground/10 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all placeholder:text-muted-foreground/60 shadow-sm"
-                      placeholder="e.g., DBMS"
-                      required
-                    />
-                  </div>
-                  
-                  <div>
-                    <label htmlFor="task-importance" className="block text-sm font-semibold text-foreground/80 mb-2">
-                      Importance
-                    </label>
-                    <select
-                      id="task-importance"
-                      value={importance}
-                      onChange={(e) => setImportance(e.target.value as TaskImportance)}
-                      className="w-full px-4 py-3 bg-muted/30 border border-foreground/10 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all cursor-pointer shadow-sm"
-                    >
-                      <option value="low">Low</option>
-                      <option value="normal">Normal</option>
-                      <option value="high">High</option>
-                    </select>
-                  </div>
-
-                  {isEditing && (
-                    <div>
-                      <label className="block text-sm font-semibold text-foreground/80 mb-2">
-                        Status
-                      </label>
-                      <select
-                        value={status}
-                        onChange={(e) => setStatus(e.target.value as TaskStatus)}
-                        className="w-full px-4 py-3 bg-muted/30 border border-foreground/10 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all cursor-pointer shadow-sm appearance-none"
-                        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1em' }}
-                      >
-                        <option value="pending">Pending</option>
-                        <option value="in_progress">In progress</option>
-                        <option value="completed">Completed</option>
-                        <option value="cancelled">Cancelled</option>
-                      </select>
-                    </div>
-                  )}
-
-                  <div>
-                    <label htmlFor="task-repeat" className="block text-sm font-semibold text-foreground/80 mb-2">
-                      Repeat
-                    </label>
-                    <select
-                      id="task-repeat"
-                      value={repeat}
-                      onChange={(e) => setRepeat(e.target.value as TaskRepeat)}
-                      className="w-full px-4 py-3 bg-muted/30 border border-foreground/10 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all cursor-pointer shadow-sm"
-                    >
-                      <option value="none">Does not repeat</option>
-                      <option value="weekly">Weekly</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-foreground/80 mb-2">
-                    Description
-                  </label>
-                  <textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    className="w-full h-28 px-4 py-3 bg-muted/30 border border-foreground/10 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all resize-none placeholder:text-muted-foreground/60 shadow-sm scrollbar-thin"
-                    placeholder="Additional assignment details, submission link, etc."
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                  <div>
-                    <label className="block text-sm font-semibold text-foreground/80 mb-2">
-                      Deadline <span className="text-destructive">*</span>
-                    </label>
-                    <input
-                      type="datetime-local"
-                      value={deadline}
-                      onChange={(e) => handleDeadlineChange(e.target.value)}
-                      className="w-full px-4 py-3 bg-muted/30 border border-foreground/10 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all shadow-sm"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-foreground/80 mb-2 flex items-center gap-2">
-                      Reminder
-                      <Bell className="w-3.5 h-3.5 text-secondary" />
-                    </label>
-                    <input
-                      type="datetime-local"
-                      value={reminderTime}
-                      onChange={(e) => setReminderTime(e.target.value)}
-                      className="w-full px-4 py-3 bg-muted/30 border border-foreground/10 rounded-[14px] text-sm focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all shadow-sm"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex gap-3 justify-end pt-6 mt-6 border-t border-foreground/5">
-                  <button
-                    type="button"
-                    onClick={() => setIsModalOpen(false)}
-                    className="px-5 py-2.5 bg-card border border-foreground/10 text-foreground font-semibold rounded-[12px] hover:bg-accent hover:border-foreground/20 transition-all cursor-pointer shadow-sm"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    className="inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-primary to-primary/90 text-primary-foreground font-semibold rounded-[12px] hover:shadow-lg hover:-translate-y-0.5 transition-all cursor-pointer disabled:opacity-50 disabled:hover:translate-y-0 disabled:shadow-none shadow-md"
-                  >
-                    {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                    {isEditing ? "Save Changes" : "Create Task"}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
+      {modal && (
+        <TaskModal task={modal.task} onClose={() => setModal(null)} onSaved={fetchTasks} />
       )}
 
       {undoToast && (
@@ -706,5 +472,13 @@ export default function TasksPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function TasksPage() {
+  return (
+    <Suspense>
+      <TasksContent />
+    </Suspense>
   );
 }
