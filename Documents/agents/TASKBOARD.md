@@ -2,7 +2,7 @@
 
 Only the orchestrator edits this. Status: TODO, IN PROGRESS, BLOCKED, DONE, SKIPPED. Order within a phase is the order of work.
 
-**Current phase: 5 (built — SQL and live testing pending)**
+**Current phase: 5 (built and tested, except email delivery — pending review)**
 
 ## Phase 1: Foundation
 
@@ -50,12 +50,12 @@ Only the orchestrator edits this. Status: TODO, IN PROGRESS, BLOCKED, DONE, SKIP
 
 | ID | Task | Status | Commit | Evidence / notes |
 |---|---|---|---|---|
-| N1 | Email reminders | DONE | build/step-5 | Needs step5 SQL; see handoff |
+| N1 | Email reminders | DONE | build/step-5 | SQL run; email sending unproven, see handoff |
 | P9 | Email verification (done as C2) | TODO | | |
-| P7 | Reports | DONE | build/step-5 | Needs step5 SQL; see handoff |
-| P6 | Weekly digest | DONE | build/step-5 | Needs step5 SQL; see handoff |
-| P10 | Share links | DONE | build/step-5 | Needs step5 SQL; see handoff |
-| P11 | Installable app | DONE | build/step-5 | Needs step5 SQL; see handoff |
+| P7 | Reports | DONE | build/step-5 | SQL run; email sending unproven, see handoff |
+| P6 | Weekly digest | DONE | build/step-5 | SQL run; email sending unproven, see handoff |
+| P10 | Share links | DONE | build/step-5 | SQL run; email sending unproven, see handoff |
+| P11 | Installable app | DONE | build/step-5 | SQL run; email sending unproven, see handoff |
 | P12 | Assistant actions (done as C31) | TODO | | |
 
 ## Phase 6: Groups

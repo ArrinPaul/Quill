@@ -35,8 +35,9 @@ history is not kept, and saving a task with a changed reminder time fails.
 
 ## 6. Not verified
 
-- Nothing that needs the new tables has been run against Supabase or clicked through: reports,
-  share dialog and page with real data, email settings.
+- After the owner ran the SQL, tested live: report figures, note and deck sharing, revoking,
+  access by a second account, email switches and focus limits. Reports at 375px in dark mode.
+- The share dialog and settings were not viewed at phone width.
 - No email has been sent through Resend; the provider is faked in tests.
 - The scheduled GitHub workflow has not run.
 - Installing on a phone and the update prompt. The service worker, cache contents and manifest were

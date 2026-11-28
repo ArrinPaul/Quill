@@ -23,10 +23,13 @@ const shortDate = (value: Date) => value.toLocaleDateString(undefined, { day: "n
 function ChartCard({
   title,
   unit,
+  max,
   rows,
 }: {
   title: string;
   unit: string;
+  /** Fixed top of the scale, for percentages. */
+  max?: number;
   rows: { key: string; label: string; value: number }[];
 }) {
   const empty = rows.every((r) => r.value === 0);
@@ -42,12 +45,12 @@ function ChartCard({
               <BarChart data={rows} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="currentColor" opacity={0.2} vertical={false} />
                 <XAxis dataKey="label" tick={{ fontSize: 11, fill: "currentColor" }} interval="preserveStartEnd" />
-                <YAxis tick={{ fontSize: 11, fill: "currentColor" }} allowDecimals={false} />
+                <YAxis tick={{ fontSize: 11, fill: "currentColor" }} allowDecimals={false} domain={max ? [0, max] : undefined} />
                 <Tooltip
                   cursor={{ fill: "currentColor", opacity: 0.08 }}
                   contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", color: "hsl(var(--card-foreground))" }}
                 />
-                <Bar dataKey="value" name={unit} fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="value" name={unit} fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} maxBarSize={56} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -164,11 +167,13 @@ export function ReportsView() {
             <ChartCard
               title="Quiz scores"
               unit="Score"
+              max={100}
               rows={report.quizzes.map((q, i) => ({ key: `${i}`, label: `${q.title} (${shortDate(new Date(q.date))})`, value: q.score }))}
             />
             <ChartCard
               title="Attendance by subject (to date)"
               unit="Percent"
+              max={100}
               rows={report.attendance.map((a) => ({ key: a.subject, label: a.subject, value: a.percentage }))}
             />
           </div>
