@@ -1,4 +1,5 @@
 "use client";
+import { ShareButton } from "@/features/share/ShareButton";
 import { useQueryAction } from "@/hooks/useQueryAction";
 import { activateOnKey } from "@/lib/a11y";
 import { useEscape } from "@/hooks/useEscape";
@@ -656,6 +657,7 @@ export default function FlashcardsPage() {
               {copiedAll ? <Check className="w-4 h-4 text-primary" /> : <Copy className="w-4 h-4" />}
               {copiedAll ? "Copied All!" : "Copy Deck"}
             </button>
+            {selectedDeckId && <ShareButton type="deck" id={selectedDeckId} />}
             <button
               type="button"
               onClick={handleExportCsv}
