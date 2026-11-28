@@ -1,6 +1,18 @@
 const Groq = require("groq-sdk");
+const {
+  flashcardsOutputSchema,
+  getQuizOutputSchema,
+  gradeShortAnswerOutputSchema,
+} = require("../schemas/ai");
+const { noteTasksOutputSchema } = require("../schemas/notes");
+
+const DEFAULT_TIMEOUT_MS = 30_000;
 
 let groq = null;
+let customCompleter = null;
+let customStreamCompleter = null;
+let aiTimeoutMs = DEFAULT_TIMEOUT_MS;
+
 try {
   const key = process.env.GROQ_API_KEY;
   if (key && key !== "placeholder") {
@@ -15,6 +27,22 @@ function isGroqAvailable() {
   return groq !== null;
 }
 
+function setGroqClient(client) {
+  groq = client;
+}
+
+function setCompleter(fn) {
+  customCompleter = fn || null;
+}
+
+function setStreamCompleter(fn) {
+  customStreamCompleter = fn || null;
+}
+
+function setAiTimeoutMs(ms) {
+  aiTimeoutMs = Number.isFinite(ms) && ms > 0 ? ms : DEFAULT_TIMEOUT_MS;
+}
+
 // Raised when the AI provider is missing or fails, so callers never present made-up output as real.
 class AIError extends Error {
   constructor(message = "The AI service is unavailable right now. Please try again later.") {
@@ -24,15 +52,41 @@ class AIError extends Error {
 }
 
 async function complete(params) {
-  if (!isGroqAvailable()) throw new AIError("AI is not configured on the server.");
+  if (!customCompleter && !isGroqAvailable()) {
+    throw new AIError("AI is not configured on the server.");
+  }
+
+  const controller = new AbortController();
+  let timer;
+  const timeoutPromise = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new AIError("The AI request timed out. Please try again."));
+    }, aiTimeoutMs);
+  });
+
   try {
-    const res = await groq.chat.completions.create({ model: "groq/compound", ...params });
-    const text = res.choices[0]?.message?.content;
-    if (!text) throw new Error("Empty AI response");
+    const work = customCompleter
+      ? Promise.resolve(customCompleter(params, { signal: controller.signal }))
+      : groq.chat.completions
+          .create({ model: "groq/compound", ...params }, { signal: controller.signal })
+          .then((res) => {
+            const text = res.choices[0]?.message?.content;
+            if (!text) throw new Error("Empty AI response");
+            return text;
+          });
+
+    const text = await Promise.race([work, timeoutPromise]);
+    if (!text || typeof text !== "string") {
+      throw new Error("Empty AI response");
+    }
     return text;
   } catch (err) {
+    if (err instanceof AIError) throw err;
     console.error("Groq request failed:", err.message);
     throw new AIError();
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -42,6 +96,15 @@ function parseJson(text) {
   } catch {
     throw new AIError("The AI returned an unreadable response. Please try again.");
   }
+}
+
+function parseAndValidateJson(text, schema) {
+  const parsed = parseJson(text);
+  const result = schema.safeParse(parsed);
+  if (!result.success) {
+    throw new AIError("The AI returned an unexpected response format. Please try again.");
+  }
+  return result.data;
 }
 
 // Returns null when no summary could be made; the notice is still worth saving.
@@ -102,6 +165,107 @@ async function chatResponse(messages) {
   });
 }
 
+async function streamComplete(params, onDelta, { signal } = {}) {
+  if (!customStreamCompleter && !isGroqAvailable()) {
+    throw new AIError("AI is not configured on the server.");
+  }
+
+  const controller = new AbortController();
+  const onExternalAbort = () => controller.abort();
+  if (signal) {
+    if (signal.aborted) {
+      controller.abort();
+    } else {
+      signal.addEventListener("abort", onExternalAbort, { once: true });
+    }
+  }
+
+  let timedOut = false;
+  let timer;
+  const timeoutPromise = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+      reject(new AIError("The AI request timed out. Please try again."));
+    }, aiTimeoutMs);
+  });
+
+  const runStream = async () => {
+    let fullText = "";
+    const emit = (delta) => {
+      if (typeof delta === "string" && delta.length > 0) {
+        fullText += delta;
+        if (onDelta) onDelta(delta);
+      }
+    };
+
+    if (customStreamCompleter) {
+      const result = await customStreamCompleter(params, {
+        signal: controller.signal,
+        onDelta: emit,
+      });
+      if (result && typeof result[Symbol.asyncIterator] === "function") {
+        for await (const chunk of result) {
+          if (controller.signal.aborted) break;
+          emit(chunk);
+        }
+      } else if (typeof result === "string" && fullText.length === 0) {
+        emit(result);
+      }
+    } else {
+      const stream = await groq.chat.completions.create(
+        { model: "groq/compound", stream: true, ...params },
+        { signal: controller.signal }
+      );
+      for await (const chunk of stream) {
+        if (controller.signal.aborted) break;
+        const delta = chunk?.choices?.[0]?.delta?.content;
+        if (delta) emit(delta);
+      }
+    }
+
+    if (controller.signal.aborted && !timedOut) {
+      const abortErr = new Error("Aborted");
+      abortErr.name = "AbortError";
+      throw abortErr;
+    }
+
+    if (!fullText) {
+      throw new Error("Empty AI response");
+    }
+    return fullText;
+  };
+
+  try {
+    return await Promise.race([runStream(), timeoutPromise]);
+  } catch (err) {
+    if (err instanceof AIError) throw err;
+    if (err?.name === "AbortError" && !timedOut) throw err;
+    console.error("Groq stream failed:", err?.message || err);
+    throw new AIError();
+  } finally {
+    clearTimeout(timer);
+    if (signal) {
+      signal.removeEventListener("abort", onExternalAbort);
+    }
+  }
+}
+
+async function streamChatResponse(messages, onDelta, options = {}) {
+  return streamComplete(
+    {
+      messages: [
+        { role: "system", content: "You are a helpful AI study assistant named Uki. You assist college students with their homework, study planning, exam preparation, and notices clarification. Keep responses helpful, structured, and friendly." },
+        ...messages,
+      ],
+      temperature: 0.7,
+      max_tokens: 800,
+    },
+    onDelta,
+    options
+  );
+}
+
 // Prevent 413 Request Entity Too Large by truncating huge documents
 const MAX_CHARS = 14000;
 const truncate = (notes) =>
@@ -123,7 +287,7 @@ Format: [{"front": "question", "back": "answer", "citation": "quote from notes"}
     temperature: 0.7,
     max_tokens: 2048,
   });
-  return parseJson(text);
+  return parseAndValidateJson(text, flashcardsOutputSchema);
 }
 
 async function generateQuiz(notes, count = 10, type = "mcq") {
@@ -140,7 +304,7 @@ Return ONLY a JSON array of objects with:
 Create exactly ${count} questions.
 Do not include any markdown format, backticks, or text outside the JSON array.
 Format: [{"question": "...", "options": ["True", "False"], "correctIndex": 0, "explanation": "...", "citation": "..."}, ...]`;
-  } else if (type === "short_answer") {
+  } else if (type === "short_answer" || type === "short") {
     promptContent = `You are a quiz generator. Create open-ended short answer questions from the given notes.
 Return ONLY a JSON array of objects with:
 - "question": the question text
@@ -173,7 +337,7 @@ Format: [{"question": "...", "options": ["A", "B", "C", "D"], "correctIndex": 0,
     temperature: 0.7,
     max_tokens: 2048,
   });
-  return parseJson(text);
+  return parseAndValidateJson(text, getQuizOutputSchema(type));
 }
 
 async function gradeShortAnswer(question, modelAnswer, userAnswer) {
@@ -191,7 +355,7 @@ Do not include any markdown, backticks, or explanation text outside the JSON obj
     temperature: 0.3,
     max_tokens: 512,
   });
-  return parseJson(text);
+  return parseAndValidateJson(text, gradeShortAnswerOutputSchema);
 }
 
 async function executeSmartTool(tool, content, options = {}) {
@@ -424,15 +588,81 @@ Do NOT wrap the JSON in Markdown backticks (e.g., \`\`\`json). Return raw JSON.`
   }
 }
 
+async function runNoteAi(action, title, content) {
+  const noteTitle = title || "Untitled";
+  const noteBody = truncate(content || "");
+
+  if (action === "summarize") {
+    const text = await complete({
+      messages: [
+        {
+          role: "system",
+          content:
+            "Summarize the student's Markdown note into clear, concise bullet points and key takeaways in Markdown. Do not invent facts outside the note.",
+        },
+        { role: "user", content: `Title: ${noteTitle}\n\n${noteBody}` },
+      ],
+      temperature: 0.3,
+      max_tokens: 900,
+    });
+    return { action, result: text.trim() };
+  }
+
+  if (action === "expand") {
+    const text = await complete({
+      messages: [
+        {
+          role: "system",
+          content:
+            "Expand the student's Markdown note into well-structured, detailed study notes in Markdown with clear headings, examples, and explanations while preserving the original points.",
+        },
+        { role: "user", content: `Title: ${noteTitle}\n\n${noteBody}` },
+      ],
+      temperature: 0.5,
+      max_tokens: 1500,
+    });
+    return { action, result: text.trim() };
+  }
+
+  const today = new Date().toISOString().split("T")[0];
+  const text = await complete({
+    messages: [
+      {
+        role: "system",
+        content: `Extract actionable study or assignment tasks from the student's note.
+Return ONLY a JSON array of 1 to 10 objects with:
+- "title": concise task title (max 150 chars)
+- "subject": relevant subject or "General"
+- "dueDate": "YYYY-MM-DD" (today is ${today}; infer a reasonable near-term date if none is mentioned)
+Do not include markdown backticks or any text outside the JSON array.`,
+      },
+      { role: "user", content: `Title: ${noteTitle}\n\n${noteBody}` },
+    ],
+    temperature: 0.3,
+    max_tokens: 1000,
+  });
+  const tasks = parseAndValidateJson(text, noteTasksOutputSchema);
+  return { action, result: tasks };
+}
+
 module.exports = {
+  AIError,
+  setGroqClient,
+  setCompleter,
+  setStreamCompleter,
+  setAiTimeoutMs,
+  complete,
+  streamComplete,
   summarizeNotice,
   getStudyTip,
   attendanceAlert,
   chatResponse,
+  streamChatResponse,
   generateFlashcards,
   generateQuiz,
   gradeShortAnswer,
   executeSmartTool,
-  extractGroupEvent
+  extractGroupEvent,
+  runNoteAi,
 };
 

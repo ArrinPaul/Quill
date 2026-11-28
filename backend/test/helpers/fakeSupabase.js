@@ -391,6 +391,42 @@ function createFakeSupabase(initialData = {}) {
     from(tableName) {
       return createQueryBuilder(tableName);
     },
+    rpc(fnName, params = {}) {
+      const today = new Date().toISOString().slice(0, 10);
+      if (fnName === "bump_ai_usage") {
+        const { p_student, p_limit } = params;
+        if (!Number.isInteger(p_limit) || p_limit <= 0) {
+          return Promise.resolve({ data: false, error: null });
+        }
+        const table = getTable("ai_usage");
+        const existing = table.find((r) => r.student_id === p_student && r.day === today);
+        if (!existing) {
+          table.push({
+            id: crypto.randomUUID(),
+            student_id: p_student,
+            day: today,
+            count: 1,
+            created_at: new Date().toISOString(),
+          });
+          return Promise.resolve({ data: true, error: null });
+        }
+        if (existing.count < p_limit) {
+          existing.count += 1;
+          return Promise.resolve({ data: true, error: null });
+        }
+        return Promise.resolve({ data: false, error: null });
+      }
+      if (fnName === "refund_ai_usage") {
+        const { p_student } = params;
+        const table = getTable("ai_usage");
+        const existing = table.find((r) => r.student_id === p_student && r.day === today);
+        if (existing && existing.count > 0) {
+          existing.count -= 1;
+        }
+        return Promise.resolve({ data: null, error: null });
+      }
+      throw new Error(`Unsupported Supabase client method: rpc(${fnName})`);
+    },
     tables,
   };
 

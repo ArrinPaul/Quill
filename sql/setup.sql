@@ -102,12 +102,16 @@ CREATE TABLE IF NOT EXISTS quizzes (
 CREATE TABLE IF NOT EXISTS quiz_questions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     quiz_id UUID NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+    type TEXT NOT NULL DEFAULT 'mcq' CHECK (type IN ('mcq', 'tf', 'short')),
     question TEXT NOT NULL,
-    options JSONB NOT NULL, -- Array of string options
-    correct_index INTEGER NOT NULL,
+    options JSONB, -- Array of string options (null for short-answer)
+    correct_index INTEGER, -- Null for short-answer
+    model_answer TEXT,
     explanation TEXT,
     user_answer_index INTEGER, -- Null until answered
+    user_answer_text TEXT,
     is_correct BOOLEAN,
+    feedback TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -305,9 +309,93 @@ CREATE TABLE IF NOT EXISTS public.activity_log (
 );
 CREATE INDEX IF NOT EXISTS idx_activity_log_student ON public.activity_log(student_id, created_at DESC);
 
+-- ===== ai_usage =====
+CREATE TABLE IF NOT EXISTS public.ai_usage (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id UUID NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
+  day DATE NOT NULL DEFAULT CURRENT_DATE,
+  count INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (student_id, day)
+);
+
+CREATE OR REPLACE FUNCTION public.bump_ai_usage(p_student uuid, p_limit int)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_count int;
+BEGIN
+  IF p_limit IS NULL OR p_limit <= 0 THEN
+    RETURN false;
+  END IF;
+
+  INSERT INTO public.ai_usage (student_id, day, count)
+  VALUES (p_student, CURRENT_DATE, 1)
+  ON CONFLICT (student_id, day)
+  DO UPDATE SET count = public.ai_usage.count + 1
+  WHERE public.ai_usage.count < p_limit
+  RETURNING count INTO v_count;
+
+  RETURN v_count IS NOT NULL;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.refund_ai_usage(p_student uuid)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  UPDATE public.ai_usage
+  SET count = count - 1
+  WHERE student_id = p_student
+    AND day = CURRENT_DATE
+    AND count > 0;
+END;
+$$;
+
 -- ===== Later columns =====
 ALTER TABLE public.quiz_questions ADD COLUMN IF NOT EXISTS citation TEXT;
 ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;
+
+-- ===== Saved AI Chat (E8) =====
+CREATE TABLE IF NOT EXISTS public.ai_conversations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id UUID NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
+  title TEXT NOT NULL DEFAULT 'New chat',
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.ai_messages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  conversation_id UUID NOT NULL REFERENCES public.ai_conversations(id) ON DELETE CASCADE,
+  role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+  content TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_conversations_student_updated
+  ON public.ai_conversations(student_id, updated_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_ai_messages_conversation_created
+  ON public.ai_messages(conversation_id, created_at ASC);
+
+-- ===== Notes (P3) =====
+CREATE TABLE IF NOT EXISTS public.notes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id UUID NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
+  title TEXT NOT NULL DEFAULT 'Untitled',
+  content TEXT NOT NULL DEFAULT '',
+  version INTEGER NOT NULL DEFAULT 1,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_notes_student_updated
+  ON public.notes(student_id, updated_at DESC);
 
 -- ===== Access control =====
 -- RLS on every table blocks the public anon key; the backend's service_role key bypasses RLS.
@@ -321,3 +409,5 @@ END $$;
 
 GRANT USAGE ON SCHEMA public TO service_role;
 GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;
+GRANT EXECUTE ON FUNCTION public.bump_ai_usage(uuid, int) TO service_role;
+GRANT EXECUTE ON FUNCTION public.refund_ai_usage(uuid) TO service_role;

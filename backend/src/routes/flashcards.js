@@ -7,6 +7,7 @@ const {
   deckIdParamSchema,
   cardInputSchema,
   createDeckSchema,
+  renameDeckSchema,
   updateCardStatusSchema,
 } = require("../schemas/flashcards");
 const { logActivity } = require("../services/activity");
@@ -71,6 +72,26 @@ router.post("/decks", validate({ body: createDeckSchema }), async (req, res, nex
     await logActivity(req.student.id, "deck_created", deck.title, deck.id);
 
     res.status(201).json({ deck, flashcards: savedCards });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Rename a deck
+router.put("/decks/:id", validate({ params: idParamSchema, body: renameDeckSchema }), async (req, res, next) => {
+  try {
+    const { title } = req.body;
+    const { data: deck, error } = await getClient()
+      .from("flashcard_decks")
+      .update({ title })
+      .eq("id", req.params.id)
+      .eq("student_id", req.student.id)
+      .select()
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!deck) return res.status(404).json({ message: "Deck not found" });
+    res.json({ deck });
   } catch (error) {
     next(error);
   }
@@ -194,6 +215,34 @@ router.delete("/:id", validate({ params: idParamSchema }), async (req, res, next
   }
 });
 
+/**
+ * Compute SM-2 spaced repetition state for a card review.
+ * mastered -> quality 5, review -> quality 2, unseen -> reset.
+ */
+function calculateSm2(existing, status, nowMs = Date.now()) {
+  let repetitions = existing?.repetitions || 0;
+  let intervalDays = existing?.interval_days || 0;
+  let easeFactor = Number(existing?.ease_factor || 2.5);
+
+  if (status === "mastered") {
+    repetitions += 1;
+    if (repetitions === 1) intervalDays = 1;
+    else if (repetitions === 2) intervalDays = 6;
+    else intervalDays = Math.round(intervalDays * easeFactor);
+    easeFactor = Math.max(1.3, easeFactor + 0.1);
+  } else if (status === "review") {
+    repetitions = 0;
+    intervalDays = 0;
+    easeFactor = Math.max(1.3, easeFactor - 0.2);
+  } else {
+    repetitions = 0;
+    intervalDays = 0;
+  }
+
+  const nextReviewAt = new Date(nowMs + intervalDays * 86400000).toISOString();
+  return { repetitions, intervalDays, easeFactor, nextReviewAt };
+}
+
 // Update flashcard status & SM-2 spaced repetition schedule
 router.patch("/:id/status", validate({ params: idParamSchema, body: updateCardStatusSchema }), async (req, res, next) => {
   try {
@@ -211,27 +260,7 @@ router.patch("/:id/status", validate({ params: idParamSchema, body: updateCardSt
       return res.status(404).json({ message: "Flashcard not found" });
     }
 
-    // SM-2 simplified calculation: mastered -> quality 5, review -> quality 2, unseen -> reset
-    let repetitions = existing.repetitions || 0;
-    let intervalDays = existing.interval_days || 0;
-    let easeFactor = Number(existing.ease_factor || 2.5);
-
-    if (status === "mastered") {
-      repetitions += 1;
-      if (repetitions === 1) intervalDays = 1;
-      else if (repetitions === 2) intervalDays = 6;
-      else intervalDays = Math.round(intervalDays * easeFactor);
-      easeFactor = Math.max(1.3, easeFactor + 0.1);
-    } else if (status === "review") {
-      repetitions = 0;
-      intervalDays = 0;
-      easeFactor = Math.max(1.3, easeFactor - 0.2);
-    } else {
-      repetitions = 0;
-      intervalDays = 0;
-    }
-
-    const nextReviewAt = new Date(Date.now() + intervalDays * 86400000).toISOString();
+    const { repetitions, intervalDays, easeFactor, nextReviewAt } = calculateSm2(existing, status);
     const nowIso = new Date().toISOString();
 
     const { data: card, error } = await supabase
@@ -265,5 +294,7 @@ router.patch("/:id/status", validate({ params: idParamSchema, body: updateCardSt
     next(error);
   }
 });
+
+router.calculateSm2 = calculateSm2;
 
 module.exports = router;

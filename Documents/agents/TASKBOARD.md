@@ -2,7 +2,7 @@
 
 Only the orchestrator edits this. Status: TODO, IN PROGRESS, BLOCKED, DONE, SKIPPED. Order within a phase is the order of work.
 
-**Current phase: 2 (complete — pending review)**
+**Current phase: 3 (complete — pending review)**
 
 ## Phase 1: Foundation
 
@@ -30,11 +30,11 @@ Only the orchestrator edits this. Status: TODO, IN PROGRESS, BLOCKED, DONE, SKIP
 
 | ID | Task | Status | Commit | Evidence / notes |
 |---|---|---|---|---|
-| B9 | AI limits and output checks | TODO | | |
-| E3 | Flashcard study modes | TODO | | |
-| E4 | Quiz types and review | TODO | | |
-| E8 | Saved AI chat | TODO | | |
-| P3 | Notes | TODO | | |
+| B9 | AI limits and output checks | DONE | 0704cfa | `ai_usage` + `bump_ai_usage` run; 30s timeout, Zod output checks, 429/503; `npm test` 60/60 |
+| E3 | Flashcard study modes | DONE | e47d9fe | `PUT /decks/:id`, Study due (N), `Quill_deck_<id>`, CSV escape, SM-2 tests; `npm test` 64/64 |
+| E4 | Quiz types and review | DONE | 7628eda | `quiz_questions` migration run; server grading, retake, mistake review; `npm test` 66/66 |
+| E8 | Saved AI chat | DONE | 36b3000 | `ai_conversations`/`ai_messages` migration run; SSE streaming + drawer; `npm test` 70/70 |
+| P3 | Notes | DONE | bb2904d | `notes` migration run; 409 concurrency, autosave, AI preview, `/dashboard/notes`; `npm test` 76/76 |
 
 ## Phase 4: Planning
 

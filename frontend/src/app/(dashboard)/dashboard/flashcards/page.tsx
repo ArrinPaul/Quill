@@ -4,17 +4,26 @@ import { useEscape } from "@/hooks/useEscape";
 import { toast } from 'sonner';
 
 import { useState, useEffect } from "react";
-import { AlertCircle, ArrowLeft, ArrowRight, BookOpen01 as BookOpen, Bookmark, Check, CheckCircle, CheckSquare, ChevronRight, Copy01 as Copy, Edit01 as Edit2, File04 as FileText, Grid01 as Grid, HelpCircle, InfoCircle as Info, LayersTwo01 as Layers, List, Loading01 as Loader2, Pin01 as Pin, Plus, RefreshCcw01 as RefreshCw, RefreshCw01 as RotateCw, Save01 as Save, Stars01 as Sparkles, Trash01 as Trash2, Upload01 as Upload, XCircle } from "@untitledui/icons";
+import { AlertCircle, ArrowLeft, ArrowRight, BookOpen01 as BookOpen, Bookmark, Check, CheckCircle, CheckSquare, ChevronRight, Copy01 as Copy, Download01 as Download, Edit01 as Edit2, File04 as FileText, Grid01 as Grid, HelpCircle, InfoCircle as Info, LayersTwo01 as Layers, List, Loading01 as Loader2, Pin01 as Pin, Plus, RefreshCcw01 as RefreshCw, RefreshCw01 as RotateCw, Save01 as Save, Stars01 as Sparkles, Trash01 as Trash2, Upload01 as Upload, XCircle } from "@untitledui/icons";
 import { api } from "@/lib/api";
+import {
+  deckPositionKey,
+  deckToCsv,
+  getDueCards,
+  getNextDueDate,
+  parseSavedPosition,
+  resolveRestoredPosition,
+  type StudyMode,
+} from "@/features/flashcards/lib/studyUtils";
 
 interface Flashcard {
   id: string | number;
   front: string;
   back: string;
-  citation?: string;
+  citation?: string | null;
   status?: "mastered" | "review" | "unseen";
   interval_days?: number;
-  next_review_at?: string;
+  next_review_at?: string | null;
 }
 
 interface Deck {
@@ -28,6 +37,9 @@ export default function FlashcardsPage() {
   // Deck State
   const [decks, setDecks] = useState<Deck[]>([]);
   const [selectedDeckId, setSelectedDeckId] = useState<string | null>(null);
+  const [studyMode, setStudyMode] = useState<StudyMode>("all");
+  const [renamingDeckId, setRenamingDeckId] = useState<string | null>(null);
+  const [renameDeckTitle, setRenameDeckTitle] = useState("");
 
   // Modal State for New Deck
   const [isDeckModalOpen, setIsDeckModalOpen] = useState(false);
@@ -64,6 +76,7 @@ export default function FlashcardsPage() {
   const [showAddCardInline, setShowAddCardInline] = useState(false);
   useEscape(isDeckModalOpen, () => setIsDeckModalOpen(false));
   useEscape(!!deleteConfirm, () => setDeleteConfirm(null));
+  useEscape(!!renamingDeckId, () => setRenamingDeckId(null));
   const [newCardFront, setNewCardFront] = useState("");
   const [newCardBack, setNewCardBack] = useState("");
   const [newCardCitation, setNewCardCitation] = useState("");
@@ -78,9 +91,18 @@ export default function FlashcardsPage() {
       try {
         const res = await api.get<{ decks: Deck[] }>("/api/flashcards/decks");
         if (res.decks && res.decks.length > 0) {
+          const firstDeck = res.decks[0];
+          const saved =
+            typeof window !== "undefined"
+              ? parseSavedPosition(localStorage.getItem(deckPositionKey(firstDeck.id)))
+              : null;
+          const restored = resolveRestoredPosition(firstDeck.flashcards || [], saved);
+
           setDecks(res.decks);
-          setSelectedDeckId(res.decks[0].id);
-          setFlashcards(res.decks[0].flashcards || []);
+          setSelectedDeckId(firstDeck.id);
+          setStudyMode(restored.mode);
+          setFlashcards(restored.cards);
+          setCurrentIndex(restored.index);
         }
       } catch (err) {
         console.error("Failed to fetch decks:", err);
@@ -88,6 +110,41 @@ export default function FlashcardsPage() {
     }
     fetchDecks();
   }, []);
+
+  // Prefill new deck modal when opened from Notes
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const raw = sessionStorage.getItem("Quill_prefill_flashcards");
+    if (!raw) return;
+    sessionStorage.removeItem("Quill_prefill_flashcards");
+    try {
+      const parsed = JSON.parse(raw) as { title?: string; content?: string };
+      queueMicrotask(() => {
+        if (parsed.title) setModalTitle(parsed.title);
+        if (parsed.content) setModalContent(parsed.content);
+        setModalTab("text");
+        setUploadError("");
+        setIsDeckModalOpen(true);
+      });
+    } catch {
+      // ignore malformed prefill
+    }
+  }, []);
+
+  // Persist current study position per deck
+  useEffect(() => {
+    if (typeof window === "undefined" || !selectedDeckId) return;
+    const currentCard = flashcards[currentIndex];
+    if (!currentCard) return;
+    try {
+      localStorage.setItem(
+        deckPositionKey(selectedDeckId),
+        JSON.stringify({ cardId: currentCard.id, mode: studyMode })
+      );
+    } catch {
+      // Ignore storage quota errors
+    }
+  }, [selectedDeckId, flashcards, currentIndex, studyMode]);
 
   // PDF.js dynamic CDN Loader helper
   const loadPdfJs = async () => {
@@ -208,6 +265,7 @@ export default function FlashcardsPage() {
       // 3. Update local state
       setDecks(prev => [newDeck, ...prev]);
       setSelectedDeckId(newDeck.id);
+      setStudyMode("all");
       setFlashcards(newDeck.flashcards);
       setCurrentIndex(0);
       
@@ -327,14 +385,14 @@ export default function FlashcardsPage() {
         setDecks(remaining);
         if (selectedDeckId === deleteConfirm.id) {
           if (remaining.length > 0) {
-            setSelectedDeckId(remaining[0].id);
-            setFlashcards(remaining[0].flashcards || []);
+            selectDeck(remaining[0]);
           } else {
             setSelectedDeckId(null);
+            setStudyMode("all");
             setFlashcards([]);
+            setCurrentIndex(0);
+            setIsFlipped(false);
           }
-          setCurrentIndex(0);
-          setIsFlipped(false);
         }
         toast.success("Deck deleted");
       }
@@ -424,10 +482,93 @@ export default function FlashcardsPage() {
 
   const handleClearDeck = () => {
     setFlashcards([]);
+    setStudyMode("all");
     setCurrentIndex(0);
     setIsFlipped(false);
     setShowSummary(false);
     setError("");
+  };
+
+  const selectDeck = (deck: Deck) => {
+    const saved =
+      typeof window !== "undefined"
+        ? parseSavedPosition(localStorage.getItem(deckPositionKey(deck.id)))
+        : null;
+    const restored = resolveRestoredPosition(deck.flashcards || [], saved);
+    setSelectedDeckId(deck.id);
+    setStudyMode(restored.mode);
+    setFlashcards(restored.cards);
+    setCurrentIndex(restored.index);
+    setIsFlipped(false);
+    setShowSummary(false);
+  };
+
+  const handleStartRenameDeck = (deck: Deck, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setRenamingDeckId(deck.id);
+    setRenameDeckTitle(deck.title);
+  };
+
+  const handleSaveDeckRename = async (deckId: string) => {
+    const trimmed = renameDeckTitle.trim();
+    if (!trimmed) {
+      toast.error("Deck title cannot be empty.");
+      return;
+    }
+    try {
+      const res = await api.put<{ deck: { id: string; title: string } }>(
+        `/api/flashcards/decks/${deckId}`,
+        { title: trimmed }
+      );
+      setDecks((prev) =>
+        prev.map((d) => (d.id === deckId ? { ...d, title: res.deck.title } : d))
+      );
+      setRenamingDeckId(null);
+      toast.success("Deck renamed");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to rename deck");
+    }
+  };
+
+  const activeDeck = decks.find((d) => d.id === selectedDeckId) ?? null;
+  const allDeckCards = activeDeck?.flashcards ?? [];
+  const dueCards = getDueCards(allDeckCards);
+  const nextDueDate = getNextDueDate(allDeckCards);
+
+  const handleStudyDue = () => {
+    if (dueCards.length === 0) return;
+    setStudyMode("due");
+    setFlashcards(dueCards);
+    setCurrentIndex(0);
+    setIsFlipped(false);
+    setShowSummary(false);
+  };
+
+  const handleStudyAll = () => {
+    setStudyMode("all");
+    setFlashcards(allDeckCards);
+    setCurrentIndex(0);
+    setIsFlipped(false);
+    setShowSummary(false);
+  };
+
+  const handleExportCsv = () => {
+    const cardsToExport = allDeckCards.length > 0 ? allDeckCards : flashcards;
+    if (cardsToExport.length === 0) {
+      toast.error("No flashcards to export.");
+      return;
+    }
+    const csv = deckToCsv(cardsToExport);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const safeTitle = (activeDeck?.title || "flashcards").replace(/[^a-z0-9-_]+/gi, "_");
+    link.href = url;
+    link.download = `${safeTitle}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const handleCopyCard = (index: number, e: React.MouseEvent) => {
@@ -509,6 +650,14 @@ export default function FlashcardsPage() {
               {copiedAll ? <Check className="w-4 h-4 text-primary" /> : <Copy className="w-4 h-4" />}
               {copiedAll ? "Copied All!" : "Copy Deck"}
             </button>
+            <button
+              type="button"
+              onClick={handleExportCsv}
+              className="inline-flex items-center gap-2 px-4 py-2 border border-border bg-card hover:bg-accent text-sm font-medium rounded-[10px] text-foreground transition-standard cursor-pointer"
+            >
+              <Download className="w-4 h-4" />
+              Export CSV
+            </button>
           </div>
         )}
       </div>
@@ -557,44 +706,91 @@ export default function FlashcardsPage() {
               ) : (
                 decks.map((deck) => {
                   const isSelected = selectedDeckId === deck.id;
-                  const dueCount = (deck.flashcards || []).filter(
-                    (c) => !c.next_review_at || new Date(c.next_review_at) <= new Date() || c.status !== "mastered"
-                  ).length;
+                  const dueCount = getDueCards(deck.flashcards || []).length;
+                  const isRenaming = renamingDeckId === deck.id;
                   return (
                     <div 
                       key={deck.id}
                       role="button" tabIndex={0} onKeyDown={activateOnKey}
-                      onClick={() => {
-                        setSelectedDeckId(deck.id);
-                        setFlashcards(deck.flashcards || []);
-                        setCurrentIndex(0);
-                        setIsFlipped(false);
-                        setShowSummary(false);
-                      }}
+                      onClick={() => selectDeck(deck)}
                       className={`group border rounded-[10px] p-3 transition-standard cursor-pointer flex flex-col gap-1.5 relative ${
                         isSelected 
                           ? "bg-card border-primary/40 shadow-sm" 
                           : "bg-transparent border-border hover:bg-muted/45"
                       }`}
                     >
-                      <div className="flex items-center gap-1.5">
-                        <BookOpen className={`w-3.5 h-3.5 flex-shrink-0 ${isSelected ? "text-primary" : "text-muted-foreground"}`} />
-                        <h4 className="font-semibold text-xs text-foreground truncate pr-7">
-                          {deck.title}
-                        </h4>
-                      </div>
-                      <button
-                        type="button"
-                        aria-label={`Delete ${deck.title}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeleteConfirm({ type: "deck", id: deck.id, label: `"${deck.title}"` });
-                        }}
-                        className="absolute top-2.5 right-2.5 p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
-                        title="Delete deck"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      {isRenaming ? (
+                        <div
+                          className="flex items-center gap-1.5"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <input
+                            type="text"
+                            value={renameDeckTitle}
+                            onChange={(e) => setRenameDeckTitle(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                handleSaveDeckRename(deck.id);
+                              } else if (e.key === "Escape") {
+                                e.stopPropagation();
+                                setRenamingDeckId(null);
+                              }
+                            }}
+                            aria-label="Deck title"
+                            className="flex-1 min-w-0 px-2 py-1 bg-background border border-border rounded text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                            autoFocus
+                          />
+                          <button
+                            type="button"
+                            aria-label="Save deck name"
+                            onClick={() => handleSaveDeckRename(deck.id)}
+                            className="p-1 rounded text-primary hover:bg-accent cursor-pointer"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label="Cancel rename"
+                            onClick={() => setRenamingDeckId(null)}
+                            className="p-1 rounded text-muted-foreground hover:bg-accent cursor-pointer"
+                          >
+                            <XCircle className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-1.5">
+                            <BookOpen className={`w-3.5 h-3.5 flex-shrink-0 ${isSelected ? "text-primary" : "text-muted-foreground"}`} />
+                            <h4 className="font-semibold text-xs text-foreground truncate pr-12">
+                              {deck.title}
+                            </h4>
+                          </div>
+                          <div className="absolute top-2.5 right-2.5 flex items-center gap-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                            <button
+                              type="button"
+                              aria-label={`Rename ${deck.title}`}
+                              onClick={(e) => handleStartRenameDeck(deck, e)}
+                              className="p-1 rounded text-muted-foreground hover:text-primary hover:bg-accent"
+                              title="Rename deck"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              aria-label={`Delete ${deck.title}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeleteConfirm({ type: "deck", id: deck.id, label: `"${deck.title}"` });
+                              }}
+                              className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                              title="Delete deck"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </>
+                      )}
                       <div className="flex items-center justify-between pl-5 pr-1">
                         <p className="text-xs text-muted-foreground font-mono">
                           {deck.flashcards?.length || 0} cards
@@ -730,6 +926,46 @@ export default function FlashcardsPage() {
           {/* Active Workspace */}
           {flashcards.length > 0 && !loading && (
             <div className="space-y-5">
+
+              {/* Study Mode Bar */}
+              {activeDeck && (
+                <div className="flex flex-wrap items-center justify-between gap-2 bg-card border border-border rounded-[10px] px-4 py-2.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleStudyAll}
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-[10px] transition-standard cursor-pointer ${
+                        studyMode === "all"
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "bg-muted text-foreground hover:bg-accent"
+                      }`}
+                    >
+                      Study all ({allDeckCards.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleStudyDue}
+                      disabled={dueCards.length === 0}
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-[10px] transition-standard ${
+                        dueCards.length === 0
+                          ? "bg-muted text-muted-foreground opacity-50 cursor-not-allowed"
+                          : studyMode === "due"
+                            ? "bg-primary text-primary-foreground shadow-sm cursor-pointer"
+                            : "bg-muted text-foreground hover:bg-accent cursor-pointer"
+                      }`}
+                    >
+                      Study due ({dueCards.length})
+                    </button>
+                  </div>
+                  {dueCards.length === 0 && (
+                    <span className="text-xs text-muted-foreground">
+                      {nextDueDate
+                        ? `Next due: ${nextDueDate.toLocaleString()}`
+                        : "All cards caught up"}
+                    </span>
+                  )}
+                </div>
+              )}
               
               {/* Tab toggles */}
               <div className="flex flex-col sm:flex-row items-center justify-between border-b border-border pb-2 gap-3">

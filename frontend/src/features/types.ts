@@ -60,6 +60,32 @@ export interface ActivityItem {
   created_at: string;
 }
 
+export type QuizType = "mcq" | "tf" | "short";
+
+export interface QuizQuestion {
+  id: string;
+  quiz_id?: string;
+  type?: QuizType;
+  question: string;
+  options: string[] | null;
+  correct_index?: number | null;
+  model_answer?: string | null;
+  user_answer_index?: number | null;
+  user_answer_text?: string | null;
+  is_correct?: boolean | null;
+  feedback?: string | null;
+  explanation?: string | null;
+  citation?: string | null;
+}
+
+export interface Quiz {
+  id: string;
+  title: string;
+  score: number | null;
+  total_questions?: number;
+  created_at?: string;
+}
+
 export interface DashboardStats {
   totalTasks: number;
   pendingTasks: number;
@@ -68,4 +94,41 @@ export interface DashboardStats {
   todayTasks: Task[];
   attendance: Attendance[];
   aiTip: string;
+}
+
+export interface AiConversation {
+  id: string;
+  student_id: string;
+  title: string;
+  updated_at: string;
+  created_at: string;
+}
+
+export interface AiMessage {
+  id: string;
+  conversation_id: string;
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
+}
+
+export interface NoteSummary {
+  id: string;
+  title: string;
+  version: number;
+  updated_at: string;
+  created_at: string;
+}
+
+export interface Note extends NoteSummary {
+  student_id: string;
+  content: string;
+}
+
+export type NoteAiAction = "summarize" | "expand" | "tasks";
+
+export interface NoteSuggestedTask {
+  title: string;
+  subject?: string;
+  dueDate?: string;
 }

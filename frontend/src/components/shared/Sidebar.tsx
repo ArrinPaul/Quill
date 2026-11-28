@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Announcement01 as Megaphone, BarChart01 as BarChart3, ChevronLeftDouble as ChevronsLeft, ChevronRightDouble as ChevronsRight, FaceSmile as Bot, GraduationHat01 as GraduationCap, HelpCircle, LayersTwo01 as Layers, LayoutGrid01 as LayoutDashboard, List as ListTodo, LogOut01 as LogOut, PenTool01 as PenTool, Settings01 as Settings, Stars01 as Sparkles } from "@untitledui/icons";
+import { Announcement01 as Megaphone, BarChart01 as BarChart3, ChevronLeftDouble as ChevronsLeft, ChevronRightDouble as ChevronsRight, FaceSmile as Bot, File04 as FileText, GraduationHat01 as GraduationCap, HelpCircle, LayersTwo01 as Layers, LayoutGrid01 as LayoutDashboard, List as ListTodo, LogOut01 as LogOut, PenTool01 as PenTool, Settings01 as Settings, Stars01 as Sparkles } from "@untitledui/icons";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
@@ -25,6 +25,7 @@ export function Sidebar({ isCollapsed, onToggle, onNavigate, hideCollapseButton 
 
   const toolItems = [
     { href: "/dashboard/tasks", icon: ListTodo, label: "Tasks" },
+    { href: "/dashboard/notes", icon: FileText, label: "Notes" },
     { href: "/dashboard/notices", icon: Megaphone, label: "Notices" },
     { href: "/dashboard/attendance", icon: BarChart3, label: "Attendance" },
     { href: "/dashboard/flashcards", icon: Layers, label: "Flashcards" },

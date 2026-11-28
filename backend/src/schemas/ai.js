@@ -1,4 +1,4 @@
-const { z, LIMITS, subjectSchema } = require("./common");
+const { z, LIMITS, subjectSchema, titleSchema } = require("./common");
 
 const attendanceAlertSchema = z
   .object({
@@ -31,7 +31,7 @@ const notesSchema = z.object({
 const quizGenerateSchema = z.object({
   notes: z.string().trim().min(1, "Required").max(LIMITS.AI_NOTES),
   count: z.number().int().min(1).max(50).optional(),
-  type: z.enum(["mcq", "short_answer", "mixed"]).optional(),
+  type: z.enum(["mcq", "tf", "short_answer", "mixed"]).optional(),
 });
 
 const gradeShortAnswerSchema = z.object({
@@ -49,6 +49,87 @@ const toolBodySchema = z.object({
   options: z.record(z.string(), z.unknown()).optional(),
 });
 
+// --- AI JSON output validation schemas ---
+
+const flashcardOutputSchema = z.object({
+  front: z.string().trim().min(1),
+  back: z.string().trim().min(1),
+  citation: z.string().trim().optional(),
+});
+
+const flashcardsOutputSchema = z.array(flashcardOutputSchema).min(1).max(30);
+
+const mcqQuizQuestionOutputSchema = z
+  .object({
+    question: z.string().trim().min(1),
+    options: z.array(z.string().trim().min(1)).length(4),
+    correctIndex: z.number().int().min(0).max(3),
+    explanation: z.string().trim().optional(),
+    citation: z.string().trim().optional(),
+  })
+  .refine((q) => q.correctIndex >= 0 && q.correctIndex < q.options.length, {
+    message: "correctIndex out of range",
+  });
+
+const tfQuizQuestionOutputSchema = z
+  .object({
+    question: z.string().trim().min(1),
+    options: z.array(z.string().trim().min(1)).length(2),
+    correctIndex: z.number().int().min(0).max(1),
+    explanation: z.string().trim().optional(),
+    citation: z.string().trim().optional(),
+  })
+  .refine((q) => q.correctIndex >= 0 && q.correctIndex < q.options.length, {
+    message: "correctIndex out of range",
+  });
+
+const shortAnswerQuizQuestionOutputSchema = z.object({
+  question: z.string().trim().min(1),
+  modelAnswer: z.string().trim().min(1),
+  explanation: z.string().trim().optional(),
+  citation: z.string().trim().optional(),
+});
+
+function getQuizOutputSchema(type = "mcq") {
+  if (type === "tf") {
+    return z.array(tfQuizQuestionOutputSchema).min(1).max(50);
+  }
+  if (type === "short_answer" || type === "short") {
+    return z.array(shortAnswerQuizQuestionOutputSchema).min(1).max(50);
+  }
+  if (type === "mixed") {
+    return z
+      .array(
+        z.union([
+          mcqQuizQuestionOutputSchema,
+          tfQuizQuestionOutputSchema,
+          shortAnswerQuizQuestionOutputSchema,
+        ])
+      )
+      .min(1)
+      .max(50);
+  }
+  return z.array(mcqQuizQuestionOutputSchema).min(1).max(50);
+}
+
+const gradeShortAnswerOutputSchema = z.object({
+  score: z.number().finite().min(0).max(100),
+  feedback: z.string().trim().min(1),
+  isCorrect: z.boolean(),
+});
+
+const createConversationSchema = z.object({
+  title: titleSchema.optional(),
+});
+
+const renameConversationSchema = z.object({
+  title: titleSchema,
+});
+
+const sendConversationMessageSchema = z.object({
+  content: z.string().trim().min(1, "Required").max(LIMITS.AI_NOTES),
+});
+
 module.exports = {
   attendanceAlertSchema,
   chatSchema,
@@ -57,4 +138,10 @@ module.exports = {
   gradeShortAnswerSchema,
   toolParamsSchema,
   toolBodySchema,
+  flashcardsOutputSchema,
+  getQuizOutputSchema,
+  gradeShortAnswerOutputSchema,
+  createConversationSchema,
+  renameConversationSchema,
+  sendConversationMessageSchema,
 };

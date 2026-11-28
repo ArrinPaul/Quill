@@ -6,12 +6,14 @@ const taskRoutes = require("./routes/tasks");
 const noticeRoutes = require("./routes/notices");
 const attendanceRoutes = require("./routes/attendance");
 const aiRoutes = require("./routes/ai");
+const aiConversationsRoutes = require("./routes/aiConversations");
 const quizRoutes = require("./routes/quizzes");
 const whiteboardRoutes = require("./routes/whiteboards");
 const calendarRoutes = require("./routes/calendar");
 const flashcardsRoutes = require("./routes/flashcards");
 const achievementsRoutes = require("./routes/achievements");
 const activityRoutes = require("./routes/activity");
+const notesRoutes = require("./routes/notes");
 
 const { generalLimiter } = require("./middleware/rateLimit");
 
@@ -30,6 +32,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/notices", noticeRoutes);
 app.use("/api/attendance", attendanceRoutes);
+app.use("/api/ai/conversations", aiConversationsRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/quizzes", quizRoutes);
 app.use("/api/whiteboards", whiteboardRoutes);
@@ -37,6 +40,7 @@ app.use("/api/calendar", calendarRoutes);
 app.use("/api/flashcards", flashcardsRoutes);
 app.use("/api/achievements", achievementsRoutes);
 app.use("/api/activity", activityRoutes);
+app.use("/api/notes", notesRoutes);
 
 const errorHandler = require("./middleware/errors");
 
