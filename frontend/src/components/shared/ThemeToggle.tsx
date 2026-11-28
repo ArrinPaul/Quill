@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import { Moon01 as Moon, Sun } from "@untitledui/icons";
 import { cn } from "@/lib/utils";
-
-const THEME_EVENT = "quill-theme-change";
+import { THEME_EVENT, toggleTheme } from "@/lib/theme";
 
 export function ThemeToggle({ className, showLabel = false }: { className?: string; showLabel?: boolean }) {
   const [dark, setDark] = useState(false);
@@ -16,22 +15,13 @@ export function ThemeToggle({ className, showLabel = false }: { className?: stri
     return () => window.removeEventListener(THEME_EVENT, sync);
   }, []);
 
-  const toggle = () => {
-    const next = !document.documentElement.classList.contains("dark");
-    document.documentElement.classList.toggle("dark", next);
-    try {
-      localStorage.setItem("Quill_theme", next ? "dark" : "light");
-    } catch {}
-    window.dispatchEvent(new Event(THEME_EVENT));
-  };
-
   const label = dark ? "Light mode" : "Dark mode";
   const Icon = dark ? Sun : Moon;
 
   return (
     <button
       type="button"
-      onClick={toggle}
+      onClick={toggleTheme}
       aria-label={label}
       title={label}
       className={cn("flex items-center gap-3 rounded-[10px] p-2 text-sm font-medium cursor-pointer", className)}

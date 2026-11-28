@@ -1,5 +1,15 @@
 const crypto = require("crypto");
 
+// Postgres LIKE: % and _ are wildcards unless escaped with a backslash.
+function likeToRegExp(pattern) {
+  const source = String(pattern).replace(/\\(.)|(%)|(_)|([^\\%_]+)/g, (_m, escaped, any, one, text) => {
+    if (any) return ".*";
+    if (one) return ".";
+    return (escaped ?? text).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  });
+  return new RegExp(`^${source}$`, "is");
+}
+
 function clone(value) {
   return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 }
@@ -137,6 +147,8 @@ function createFakeSupabase(initialData = {}) {
           if (actual === undefined || actual === null || actual >= f.val) return false;
         } else if (f.op === "lte") {
           if (actual === undefined || actual === null || actual > f.val) return false;
+        } else if (f.op === "ilike") {
+          if (typeof actual !== "string" || !likeToRegExp(f.val).test(actual)) return false;
         }
       }
 
@@ -349,6 +361,10 @@ function createFakeSupabase(initialData = {}) {
       },
       lte(col, val) {
         state.filters.push({ op: "lte", col, val });
+        return proxy;
+      },
+      ilike(col, val) {
+        state.filters.push({ op: "ilike", col, val });
         return proxy;
       },
       order(col, { ascending = true } = {}) {

@@ -1,5 +1,6 @@
 "use client";
 
+import { useQueryAction } from "@/hooks/useQueryAction";
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import {
@@ -96,6 +97,10 @@ export default function QuizPage() {
   useEffect(() => {
     fetchQuizzes();
   }, [fetchQuizzes]);
+
+  useQueryAction("open", quizzes.length > 0, (id) => {
+    if (quizzes.some((q) => q.id === id)) setSelectedQuizId(id);
+  });
 
   // Prefill new quiz modal when opened from Notes
   useEffect(() => {

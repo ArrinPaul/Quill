@@ -1,4 +1,5 @@
 "use client";
+import { useQueryAction } from "@/hooks/useQueryAction";
 import { activateOnKey } from "@/lib/a11y";
 import { useEscape } from "@/hooks/useEscape";
 import { toast } from 'sonner';
@@ -502,6 +503,11 @@ export default function FlashcardsPage() {
     setIsFlipped(false);
     setShowSummary(false);
   };
+
+  useQueryAction("open", decks.length > 0, (id) => {
+    const deck = decks.find((d) => d.id === id);
+    if (deck) selectDeck(deck);
+  });
 
   const handleStartRenameDeck = (deck: Deck, e: React.MouseEvent) => {
     e.stopPropagation();

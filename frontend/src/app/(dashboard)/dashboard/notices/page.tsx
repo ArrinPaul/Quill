@@ -1,5 +1,6 @@
 "use client";
 
+import { useQueryAction } from "@/hooks/useQueryAction";
 import { useEffect, useState } from "react";
 import { Announcement01 as Megaphone, Calendar, Loading01 as Loader2, RefreshCcw01 as RefreshCw, Stars01 as Sparkles } from "@untitledui/icons";
 import { api } from "@/lib/api";
@@ -76,6 +77,13 @@ export default function NoticesPage() {
   useEffect(() => {
     fetchNotices();
   }, []);
+
+  useQueryAction("open", !loading, (id) => {
+    const notice = notices.find((n) => n.id === id);
+    if (!notice) return;
+    setTimelineFilter("all");
+    setActiveNotice(notice);
+  });
 
   const handleSummarize = async () => {
     setError("");

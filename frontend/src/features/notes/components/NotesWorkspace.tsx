@@ -1,5 +1,6 @@
 "use client";
 
+import { useQueryAction } from "@/hooks/useQueryAction";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
@@ -176,6 +177,9 @@ export function NotesWorkspace() {
       setCreating(false);
     }
   };
+
+  useQueryAction("open", !loadingList, (id) => void openNote(id));
+  useQueryAction("new", !loadingList, () => void handleCreateNote());
 
   const handleDeleteNote = async (id: string) => {
     setDeletingId(id);

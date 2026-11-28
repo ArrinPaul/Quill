@@ -1,5 +1,6 @@
 'use client';
 
+import { useQueryAction } from "@/hooks/useQueryAction";
 import { useEscape } from "@/hooks/useEscape";
 import { useState, useEffect } from 'react';
 import { useWhiteboards } from '@/features/whiteboard/hooks/useWhiteboards';
@@ -31,6 +32,10 @@ export default function WhiteboardPage() {
   }, [fetchWhiteboards]);
 
   const activeBoard = whiteboards.find(w => w.id === activeBoardId);
+
+  useQueryAction("open", whiteboards.length > 0, (id) => {
+    if (whiteboards.some((w) => w.id === id)) setActiveBoardId(id);
+  });
 
   const handleCreateBoard = () => {
     setNewBoardTitle('New Whiteboard');
