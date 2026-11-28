@@ -29,6 +29,7 @@ const PAGES = [
   ["Quiz", "/dashboard/quiz"],
   ["Smart Tools", "/dashboard/tools"],
   ["Whiteboard", "/dashboard/whiteboard"],
+  ["Reports", "/dashboard/reports"],
   ["Settings", "/dashboard/settings"],
 ] as const;
 
