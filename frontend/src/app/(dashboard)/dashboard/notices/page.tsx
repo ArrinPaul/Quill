@@ -1,5 +1,6 @@
 "use client";
 
+import { useQueryAction } from "@/hooks/useQueryAction";
 import { useEffect, useState } from "react";
 import { Announcement01 as Megaphone, Calendar, Loading01 as Loader2, RefreshCcw01 as RefreshCw, Stars01 as Sparkles } from "@untitledui/icons";
 import { api } from "@/lib/api";
@@ -12,6 +13,7 @@ export default function NoticesPage() {
   const [timelineFilter, setTimelineFilter] = useState<TimelineFilter>("upcoming");
   const [notices, setNotices] = useState<Notice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
   
   // Form input states
   const [noticeText, setNoticeText] = useState("");
@@ -62,6 +64,7 @@ export default function NoticesPage() {
     try {
       const noticesRes = await api.get<{ notices: Notice[] }>("/api/notices");
       setNotices(noticesRes.notices || []);
+      setLoaded(true);
       
       if (noticesRes.notices && noticesRes.notices.length > 0 && !activeNotice) {
         setActiveNotice(noticesRes.notices[0]);
@@ -76,6 +79,16 @@ export default function NoticesPage() {
   useEffect(() => {
     fetchNotices();
   }, []);
+
+  useQueryAction("open", loaded, (id) => {
+    const notice = notices.find((n) => n.id === id);
+    if (!notice) {
+      setError("That notice no longer exists.");
+      return;
+    }
+    setTimelineFilter("all");
+    setActiveNotice(notice);
+  });
 
   const handleSummarize = async () => {
     setError("");

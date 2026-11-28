@@ -14,6 +14,7 @@ const flashcardsRoutes = require("./routes/flashcards");
 const achievementsRoutes = require("./routes/achievements");
 const activityRoutes = require("./routes/activity");
 const notesRoutes = require("./routes/notes");
+const searchRoutes = require("./routes/search");
 
 const { generalLimiter } = require("./middleware/rateLimit");
 
@@ -42,6 +43,7 @@ app.use("/api/flashcards", flashcardsRoutes);
 app.use("/api/achievements", achievementsRoutes);
 app.use("/api/activity", activityRoutes);
 app.use("/api/notes", notesRoutes);
+app.use("/api/search", searchRoutes);
 
 const errorHandler = require("./middleware/errors");
 

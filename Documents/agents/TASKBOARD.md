@@ -2,7 +2,7 @@
 
 Only the orchestrator edits this. Status: TODO, IN PROGRESS, BLOCKED, DONE, SKIPPED. Order within a phase is the order of work.
 
-**Current phase: 3 (complete — pending review)**
+**Current phase: 4 (complete — pending review)**
 
 ## Phase 1: Foundation
 
@@ -40,11 +40,11 @@ Only the orchestrator edits this. Status: TODO, IN PROGRESS, BLOCKED, DONE, SKIP
 
 | ID | Task | Status | Commit | Evidence / notes |
 |---|---|---|---|---|
-| P1 | Task board | TODO | | |
-| P2 | Calendar page | TODO | | |
-| P4 | Search and command palette | TODO | | |
-| P5 | Daily recap | TODO | | |
-| P8 | Workload warning | TODO | | |
+| P1 | Task board | DONE | 37e1853 | Board view, drag, Move to, rollback |
+| P2 | Calendar page | DONE | ff0e9a0 | Month and week, tasks and notices |
+| P4 | Search and command palette | DONE | 282853f | `/api/search`, Ctrl+K; keyboard use not verified |
+| P5 | Daily recap | DONE | bd2b4f0 | Dashboard card |
+| P8 | Workload warning | DONE | 15dacd1 | Unit tested |
 
 ## Phase 5: Later (owner approves each)
 

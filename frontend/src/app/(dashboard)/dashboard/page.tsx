@@ -20,6 +20,7 @@ import { OnboardingTour } from "@/components/dashboard/OnboardingTour";
 import { MonthlyCalendarWidget } from "@/components/dashboard/MonthlyCalendarWidget";
 import { Calendar as CalendarDays, CheckCircle, Clock, List as ListTodo, XClose as X } from "@untitledui/icons";
 import { api } from "@/lib/api";
+import { DailyRecap } from "@/features/dashboard/components/DailyRecap";
 import type { Task, Attendance } from "@/features/types";
 
 
@@ -185,6 +186,8 @@ export default function DashboardPage() {
           <StatCard icon={CheckCircle} label="Completed" value={String(completedCount)} color="bg-emerald-50 text-emerald-600" />
         </div>
       )}
+
+      {!loading && <DailyRecap tasks={tasks} attendance={attendance} />}
 
       {/* ── Row 2: Calendar  |  Tasks + Deadlines ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">

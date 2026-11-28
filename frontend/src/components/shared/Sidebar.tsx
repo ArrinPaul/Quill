@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Announcement01 as Megaphone, BarChart01 as BarChart3, ChevronLeftDouble as ChevronsLeft, ChevronRightDouble as ChevronsRight, FaceSmile as Bot, File04 as FileText, GraduationHat01 as GraduationCap, HelpCircle, LayersTwo01 as Layers, LayoutGrid01 as LayoutDashboard, List as ListTodo, LogOut01 as LogOut, PenTool01 as PenTool, Settings01 as Settings, Stars01 as Sparkles } from "@untitledui/icons";
+import { Announcement01 as Megaphone, Calendar, SearchMd as Search, BarChart01 as BarChart3, ChevronLeftDouble as ChevronsLeft, ChevronRightDouble as ChevronsRight, FaceSmile as Bot, File04 as FileText, GraduationHat01 as GraduationCap, HelpCircle, LayersTwo01 as Layers, LayoutGrid01 as LayoutDashboard, List as ListTodo, LogOut01 as LogOut, PenTool01 as PenTool, Settings01 as Settings, Stars01 as Sparkles } from "@untitledui/icons";
+import { PALETTE_EVENT } from "@/components/shared/CommandPalette";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
@@ -25,6 +26,7 @@ export function Sidebar({ isCollapsed, onToggle, onNavigate, hideCollapseButton 
 
   const toolItems = [
     { href: "/dashboard/tasks", icon: ListTodo, label: "Tasks" },
+    { href: "/dashboard/calendar", icon: Calendar, label: "Calendar" },
     { href: "/dashboard/notes", icon: FileText, label: "Notes" },
     { href: "/dashboard/notices", icon: Megaphone, label: "Notices" },
     { href: "/dashboard/attendance", icon: BarChart3, label: "Attendance" },
@@ -70,6 +72,23 @@ export function Sidebar({ isCollapsed, onToggle, onNavigate, hideCollapseButton 
       </div>
 
       <nav className="flex-1 overflow-y-auto sidebar-scroll py-3 px-2 space-y-0.5">
+        <button
+          type="button"
+          onClick={() => {
+            onNavigate?.();
+            window.dispatchEvent(new Event(PALETTE_EVENT));
+          }}
+          title="Search (Ctrl+K)"
+          aria-label="Search"
+          className={cn(
+            "flex items-center gap-3 w-full py-2 rounded-[10px] text-sm font-medium cursor-pointer text-white/70 hover:bg-white/10 hover:text-white",
+            isCollapsed ? "justify-center px-0" : "px-3"
+          )}
+        >
+          <Search className="w-4.5 h-4.5 flex-shrink-0" />
+          {!isCollapsed && <span className="flex-1 text-left">Search</span>}
+          {!isCollapsed && <kbd className="text-[10px] text-white/50">Ctrl K</kbd>}
+        </button>
         {navItems.map((item) => (
           <Link
             key={item.href}

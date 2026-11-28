@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { useSidebar } from "@/hooks/useSidebar";
+import { CommandPalette } from "@/components/shared/CommandPalette";
 import { Sidebar } from "@/components/shared/Sidebar";
 import { MobileFooter } from "@/components/shared/MobileFooter";
 import { MobileNav } from "@/components/shared/MobileNav";
@@ -52,11 +53,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       <div className="flex-1 flex flex-col min-h-screen min-w-0">
         <main className={`flex-1 overflow-auto ${!isDesktop ? "pb-16" : ""}`}>
-          <div className={isWhiteboard ? "p-4" : "p-4 sm:p-6"}>{children}</div>
+          <div className={isWhiteboard ? "p-4" : "p-4 sm:p-6"}><Suspense>{children}</Suspense></div>
         </main>
 
         {!isDesktop && <MobileFooter onMenuClick={openMobile} />}
       </div>
+
+      <CommandPalette />
     </div>
   );
 }
