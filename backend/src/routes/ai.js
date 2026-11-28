@@ -34,10 +34,10 @@ function uploadDocument(req, res, next) {
   });
 }
 
-router.post("/parse-document", authMiddleware, aiLimiter, uploadDocument, aiQuota, async (req, res) => {
+// Reads the file locally with no model call, so only the rate limit applies.
+router.post("/parse-document", authMiddleware, aiLimiter, uploadDocument, async (req, res) => {
   try {
     if (!req.file) {
-      await refundAiQuota(req.student.id);
       return res.status(400).json({ message: "No document provided" });
     }
 
@@ -70,17 +70,12 @@ router.post("/parse-document", authMiddleware, aiLimiter, uploadDocument, aiQuot
     } else if (['txt', 'md', 'csv', 'json'].includes(extension)) {
       text = file.buffer.toString('utf-8');
     } else {
-      await refundAiQuota(req.student.id);
       return res.status(400).json({ message: "Unsupported file type. Please upload a PDF or text file." });
     }
     
     res.json({ text });
   } catch (error) {
     console.error("Document parse error:", error);
-    if (req.aiQuotaCharged && req.student?.id) {
-      req.aiQuotaCharged = false;
-      await refundAiQuota(req.student.id);
-    }
     res.status(422).json({ message: "Failed to parse document. The file may be damaged." });
   }
 });
@@ -95,7 +90,8 @@ router.get("/tip", async (req, res) => {
   }
 });
 
-router.post("/attendance-alert", authMiddleware, aiLimiter, validate({ body: attendanceAlertSchema }), aiQuota, async (req, res, next) => {
+// Plain arithmetic, no model call, so it is not charged against the AI limits.
+router.post("/attendance-alert", authMiddleware, validate({ body: attendanceAlertSchema }), async (req, res, next) => {
   try {
     const { subject, total, attended, threshold } = req.body;
     const result = await attendanceAlert(subject, total, attended, threshold);

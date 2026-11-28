@@ -122,7 +122,10 @@ router.post("/", validate({ body: createQuizSchema }), async (req, res, next) =>
 
 // PATCH /api/quizzes/:id/submit - Server-side grading & score computation
 router.patch("/:id/submit", validate({ params: idParamSchema, body: submitQuizSchema }), async (req, res, next) => {
-  let quotaCharged = false;
+  let charged = 0;
+  const refundCharges = async () => {
+    for (; charged > 0; charged -= 1) await refundAiQuota(req.student.id);
+  };
   try {
     const { id } = req.params;
     const { answers } = req.body;
@@ -137,6 +140,10 @@ router.patch("/:id/submit", validate({ params: idParamSchema, body: submitQuizSc
 
     if (quizError || !quiz) {
       return res.status(404).json({ message: "Quiz not found or unauthorized" });
+    }
+    // The answers are shown after submitting, so a new attempt has to go through retake.
+    if (quiz.score !== null && quiz.score !== undefined) {
+      return res.status(409).json({ message: "Quiz already submitted. Use retake to try again." });
     }
 
     const { data: questions, error: qError } = await supabase
@@ -153,22 +160,24 @@ router.patch("/:id/submit", validate({ params: idParamSchema, body: submitQuizSc
       answersById.set(ans.question_id, ans);
     }
 
-    const needsAiGrading = allQuestions.some((q) => {
+    const aiGraded = allQuestions.filter((q) => {
       if ((q.type || "mcq") !== "short") return false;
       const ans = answersById.get(q.id);
       return typeof ans?.user_answer_text === "string" && ans.user_answer_text.trim().length > 0;
     });
 
-    if (needsAiGrading) {
+    // Each short answer is its own model call, so each one counts against the daily limit.
+    while (charged < aiGraded.length) {
       const { data: allowed, error: quotaError } = await supabase.rpc("bump_ai_usage", {
         p_student: req.student.id,
         p_limit: getDailyLimit(),
       });
       if (quotaError) throw quotaError;
       if (!allowed) {
+        await refundCharges();
         return res.status(429).json({ message: "Daily AI limit reached" });
       }
-      quotaCharged = true;
+      charged += 1;
     }
 
     // Grade every question in memory first; if AI grading fails, nothing is persisted.
@@ -259,10 +268,7 @@ router.patch("/:id/submit", validate({ params: idParamSchema, body: submitQuizSc
       questions: updatedQuestions || [],
     });
   } catch (error) {
-    if (quotaCharged) {
-      quotaCharged = false;
-      await refundAiQuota(req.student.id);
-    }
+    await refundCharges();
     next(error);
   }
 });

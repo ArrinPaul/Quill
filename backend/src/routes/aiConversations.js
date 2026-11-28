@@ -10,7 +10,7 @@ const {
   renameConversationSchema,
   sendConversationMessageSchema,
 } = require("../schemas/ai");
-const { streamChatResponse } = require("../services/groq");
+const { streamChatResponse, AIError } = require("../services/groq");
 
 const router = express.Router();
 
@@ -157,6 +157,7 @@ router.post(
     let clientAborted = false;
     let streamFinished = false;
     let sseStarted = false;
+    let delivered = false;
 
     const writeEvent = (payload) => {
       if (!res.writableEnded) {
@@ -173,17 +174,27 @@ router.post(
 
     try {
       const now = new Date().toISOString();
-      const { data: userMessage, error: insertUserError } = await supabase
+      // A retry of a failed send must not store the same question twice.
+      const { data: lastRows, error: lastError } = await supabase
         .from("ai_messages")
-        .insert({
-          conversation_id: conversationId,
-          role: "user",
-          content,
-        })
         .select("*")
-        .single();
+        .eq("conversation_id", conversationId)
+        .order("created_at", { ascending: false })
+        .limit(1);
 
-      if (insertUserError) throw insertUserError;
+      if (lastError) throw lastError;
+
+      let userMessage = lastRows?.[0];
+      if (userMessage?.role !== "user" || userMessage.content !== content) {
+        const { data, error: insertUserError } = await supabase
+          .from("ai_messages")
+          .insert({ conversation_id: conversationId, role: "user", content })
+          .select("*")
+          .single();
+
+        if (insertUserError) throw insertUserError;
+        userMessage = data;
+      }
 
       const { error: updateConvError } = await supabase
         .from("ai_conversations")
@@ -213,7 +224,8 @@ router.post(
       res.flushHeaders?.();
       sseStarted = true;
 
-      req.on("close", () => {
+      // res, not req: the request stream has already closed once its body was read.
+      res.on("close", () => {
         if (!streamFinished) {
           clientAborted = true;
           abortController.abort();
@@ -224,6 +236,7 @@ router.post(
         history,
         (delta) => {
           if (!clientAborted) {
+            delivered = true;
             writeEvent({ delta });
           }
         },
@@ -231,7 +244,8 @@ router.post(
       );
 
       if (clientAborted) {
-        await refundIfCharged();
+        // Stopping after text arrived still counts, or Stop would make the limit free.
+        if (!delivered) await refundIfCharged();
         streamFinished = true;
         if (!res.writableEnded) res.end();
         return;
@@ -261,17 +275,19 @@ router.post(
       res.end();
     } catch (err) {
       streamFinished = true;
-      await refundIfCharged();
+      if (!(clientAborted && delivered)) await refundIfCharged();
 
       if (!sseStarted) {
         return next(err);
       }
 
       if (!clientAborted && !res.writableEnded) {
+        console.error("AI chat reply failed:", err?.message || err);
         writeEvent({
           error:
-            err?.message ||
-            "The AI service is unavailable right now. Please try again later.",
+            err instanceof AIError
+              ? err.message
+              : "The AI service is unavailable right now. Please try again later.",
         });
       }
       if (!res.writableEnded) {

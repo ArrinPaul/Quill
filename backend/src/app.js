@@ -25,7 +25,8 @@ const allowedOrigins = (process.env.FRONTEND_URL || "http://localhost:3000")
   .split(",")
   .map((origin) => origin.trim().replace(/\/$/, ""));
 app.use(cors({ origin: allowedOrigins }));
-app.use(express.json());
+// A 100,000 character note is larger than the 100kb default.
+app.use(express.json({ limit: "1mb" }));
 app.use("/api", generalLimiter);
 
 app.use("/api/auth", authRoutes);

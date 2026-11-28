@@ -63,6 +63,8 @@ export default function AiAssistantPage() {
 
   const abortRef = useRef<AbortController | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  // Conversation whose messages were asked for last; older responses are ignored.
+  const requestedRef = useRef<string | null>(null);
 
   useEscape(drawerOpen, () => setDrawerOpen(false));
 
@@ -75,6 +77,7 @@ export default function AiAssistantPage() {
   }, [messages, scrollToBottom]);
 
   const fetchMessagesFor = useCallback(async (conversationId: string) => {
+    requestedRef.current = conversationId;
     setLoadingMessages(true);
     setErrorMsg(null);
     setLastFailedPrompt(null);
@@ -82,6 +85,7 @@ export default function AiAssistantPage() {
       const res = await api.get<{ messages: AiMessage[] }>(
         `/api/ai/conversations/${conversationId}/messages`
       );
+      if (requestedRef.current !== conversationId) return;
       if (res.messages.length === 0) {
         setMessages([WELCOME_MESSAGE]);
       } else {
@@ -94,10 +98,11 @@ export default function AiAssistantPage() {
         );
       }
     } catch (err) {
+      if (requestedRef.current !== conversationId) return;
       setErrorMsg(err instanceof Error ? err.message : "Failed to load messages.");
       setMessages([WELCOME_MESSAGE]);
     } finally {
-      setLoadingMessages(false);
+      if (requestedRef.current === conversationId) setLoadingMessages(false);
     }
   }, []);
 
@@ -151,6 +156,8 @@ export default function AiAssistantPage() {
       );
       const created = res.conversation;
       setConversations((prev) => [created, ...prev]);
+      requestedRef.current = created.id;
+      setLoadingMessages(false);
       setActiveId(created.id);
       setMessages([WELCOME_MESSAGE]);
       setLastFailedPrompt(null);
