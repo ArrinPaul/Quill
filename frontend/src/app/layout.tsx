@@ -4,6 +4,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { Toaster } from "sonner";
+import { ServiceWorker } from "@/components/shared/ServiceWorker";
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
@@ -40,6 +41,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <AuthProvider>{children}</AuthProvider>
         <Toaster richColors position="top-center" />
+        <ServiceWorker />
       </body>
     </html>
   );
