@@ -127,6 +127,9 @@ router.post("/:code/accept", authMiddleware, async (req, res, next) => {
     if (!data || data.status === "not_found") {
       return res.status(404).json({ message: INVITE_NOT_FOUND_MSG });
     }
+    if (data.status === "banned") {
+      return res.status(403).json({ message: "You are banned from this study group." });
+    }
     if (data.status === "full") {
       return res.status(409).json({ message: "This study group has reached its 75-member limit." });
     }

@@ -4,6 +4,7 @@ const { getClient } = require("../services/supabase");
 const authMiddleware = require("../middleware/auth");
 const validate = require("../middleware/validate");
 const { requireMember } = require("../services/access");
+const { logAudit } = require("../services/audit");
 const {
   idParamSchema,
   memberParamSchema,
@@ -14,6 +15,13 @@ const {
   transferOwnershipSchema,
 } = require("../schemas/groups");
 const { inviteParamSchema, createInviteSchema } = require("../schemas/invites");
+const {
+  createReportSchema,
+  reportParamSchema,
+  resolveReportSchema,
+  removeMemberQuerySchema,
+  removeMemberBodySchema,
+} = require("../schemas/safety");
 const { generateInviteCode, hashInviteCode } = require("./invites");
 
 const router = express.Router();
@@ -309,6 +317,7 @@ router.patch(
         .single();
 
       if (updateError) throw updateError;
+      await logAudit(req.params.id, req.student.id, "role_change", `${req.params.sid}:${req.body.role}`);
       res.json({ member });
     } catch (error) {
       next(error);
@@ -316,60 +325,105 @@ router.patch(
   }
 );
 
-router.delete("/:id/members/:sid", validate({ params: memberParamSchema }), async (req, res, next) => {
-  try {
-    const actor = await requireMember(req.params.id, req.student.id, "member");
-    const isSelf = req.params.sid === req.student.id;
+router.delete(
+  "/:id/members/:sid",
+  validate({
+    params: memberParamSchema,
+    query: removeMemberQuerySchema,
+    body: removeMemberBodySchema,
+  }),
+  async (req, res, next) => {
+    try {
+      const actor = await requireMember(req.params.id, req.student.id, "member");
+      const isSelf = req.params.sid === req.student.id;
+      const shouldBan = Boolean(req.query?.ban || req.body?.ban);
 
-    if (!isSelf && actor.role === "member") {
-      return res.status(403).json({ message: "You do not have permission to remove other members." });
-    }
+      if (!isSelf && actor.role === "member") {
+        return res.status(403).json({ message: "You do not have permission to remove other members." });
+      }
 
-    const supabase = getClient();
-    const { data: target, error: targetError } = await supabase
-      .from("study_group_members")
-      .select("id, role")
-      .eq("group_id", req.params.id)
-      .eq("student_id", req.params.sid)
-      .maybeSingle();
+      if (isSelf && shouldBan) {
+        return res.status(400).json({ message: "You cannot ban yourself." });
+      }
 
-    if (targetError) throw targetError;
-    if (!target) {
-      return res.status(404).json({ message: "Member not found" });
-    }
+      const supabase = getClient();
+      const { data: target, error: targetError } = await supabase
+        .from("study_group_members")
+        .select("id, role")
+        .eq("group_id", req.params.id)
+        .eq("student_id", req.params.sid)
+        .maybeSingle();
 
-    if (target.role === "owner") {
-      return res.status(400).json({
+      if (targetError) throw targetError;
+      if (!target) {
+        return res.status(404).json({ message: "Member not found" });
+      }
+
+      if (target.role === "owner") {
+        return res.status(400).json({
+          message: isSelf
+            ? "Owner cannot leave the group without transferring ownership."
+            : "Cannot remove the group owner.",
+        });
+      }
+
+      if (!isSelf && actor.role === "admin" && target.role === "admin") {
+        return res.status(403).json({ message: "Admins cannot remove other admins." });
+      }
+
+      const { error: deleteError } = await supabase
+        .from("study_group_members")
+        .delete()
+        .eq("group_id", req.params.id)
+        .eq("student_id", req.params.sid);
+
+      if (deleteError) throw deleteError;
+
+      const { error: rotateError } = await supabase
+        .from("study_groups")
+        .update({ realtime_key: newRealtimeKey() })
+        .eq("id", req.params.id);
+
+      if (rotateError) throw rotateError;
+
+      if (!isSelf && shouldBan) {
+        const { data: existingBan, error: banCheckError } = await supabase
+          .from("study_group_bans")
+          .select("id")
+          .eq("group_id", req.params.id)
+          .eq("student_id", req.params.sid)
+          .maybeSingle();
+
+        if (banCheckError) throw banCheckError;
+        if (!existingBan) {
+          const { error: banError } = await supabase.from("study_group_bans").insert({
+            group_id: req.params.id,
+            student_id: req.params.sid,
+            banned_by: req.student.id,
+            reason: req.body?.reason ?? null,
+          });
+          if (banError) throw banError;
+        }
+        await logAudit(req.params.id, req.student.id, "member_ban", req.params.sid);
+      } else if (!isSelf) {
+        await logAudit(req.params.id, req.student.id, "member_remove", req.params.sid);
+      } else {
+        await logAudit(req.params.id, req.student.id, "member_leave", req.params.sid);
+      }
+
+      res.json({
         message: isSelf
-          ? "Owner cannot leave the group without transferring ownership."
-          : "Cannot remove the group owner.",
+          ? "Left study group"
+          : shouldBan
+            ? "Member removed and banned"
+            : "Member removed",
+        banned: !isSelf && shouldBan,
       });
+    } catch (error) {
+      next(error);
     }
-
-    if (!isSelf && actor.role === "admin" && target.role === "admin") {
-      return res.status(403).json({ message: "Admins cannot remove other admins." });
-    }
-
-    const { error: deleteError } = await supabase
-      .from("study_group_members")
-      .delete()
-      .eq("group_id", req.params.id)
-      .eq("student_id", req.params.sid);
-
-    if (deleteError) throw deleteError;
-
-    const { error: rotateError } = await supabase
-      .from("study_groups")
-      .update({ realtime_key: newRealtimeKey() })
-      .eq("id", req.params.id);
-
-    if (rotateError) throw rotateError;
-
-    res.json({ message: isSelf ? "Left study group" : "Member removed" });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 router.post("/:id/transfer", validate({ params: idParamSchema, body: transferOwnershipSchema }), async (req, res, next) => {
   try {
@@ -417,6 +471,7 @@ router.post("/:id/transfer", validate({ params: idParamSchema, body: transferOwn
 
     if (groupError) throw groupError;
 
+    await logAudit(req.params.id, req.student.id, "ownership_transfer", studentId);
     res.json({ message: "Ownership transferred", ownerId: studentId });
   } catch (error) {
     next(error);
@@ -453,6 +508,7 @@ router.post(
         .single();
 
       if (error) throw error;
+      await logAudit(req.params.id, req.student.id, "invite_create", invite.id);
       res.status(201).json({ invite, code });
     } catch (error) {
       next(error);
@@ -498,7 +554,182 @@ router.delete(
       if (!invite) {
         return res.status(404).json({ message: "Invite not found" });
       }
+      await logAudit(req.params.id, req.student.id, "invite_revoke", invite.id);
       res.json({ invite });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.post(
+  "/:id/reports",
+  validate({ params: idParamSchema, body: createReportSchema }),
+  async (req, res, next) => {
+    try {
+      await requireMember(req.params.id, req.student.id, "member");
+      const supabase = getClient();
+
+      const { data: report, error } = await supabase
+        .from("reports")
+        .insert({
+          group_id: req.params.id,
+          reporter_id: req.student.id,
+          target_type: req.body.targetType,
+          target_id: req.body.targetId,
+          reason: req.body.reason,
+          status: "open",
+        })
+        .select("id, reporter_id, group_id, target_type, target_id, reason, status, resolved_by, resolved_at, created_at")
+        .single();
+
+      if (error) throw error;
+      await logAudit(
+        req.params.id,
+        req.student.id,
+        "report_create",
+        `${report.id}:${report.target_type}:${report.target_id}`
+      );
+      res.status(201).json({ report });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.get("/:id/reports", validate({ params: idParamSchema }), async (req, res, next) => {
+  try {
+    await requireMember(req.params.id, req.student.id, "admin");
+    const supabase = getClient();
+
+    const { data: reports, error } = await supabase
+      .from("reports")
+      .select("id, reporter_id, group_id, target_type, target_id, reason, status, resolved_by, resolved_at, created_at")
+      .eq("group_id", req.params.id)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    res.json({ reports: reports || [] });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch(
+  "/:id/reports/:reportId",
+  validate({ params: reportParamSchema, body: resolveReportSchema }),
+  async (req, res, next) => {
+    try {
+      await requireMember(req.params.id, req.student.id, "admin");
+      const supabase = getClient();
+
+      const { data: report, error } = await supabase
+        .from("reports")
+        .update({
+          status: req.body.status,
+          resolved_by: req.student.id,
+          resolved_at: new Date().toISOString(),
+        })
+        .eq("id", req.params.reportId)
+        .eq("group_id", req.params.id)
+        .select("id, reporter_id, group_id, target_type, target_id, reason, status, resolved_by, resolved_at, created_at")
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!report) {
+        return res.status(404).json({ message: "Report not found" });
+      }
+
+      await logAudit(req.params.id, req.student.id, "report_resolve", `${report.id}:${report.status}`);
+      res.json({ report });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.get("/:id/audit", validate({ params: idParamSchema }), async (req, res, next) => {
+  try {
+    await requireMember(req.params.id, req.student.id, "owner");
+    const supabase = getClient();
+
+    const { data: entries, error } = await supabase
+      .from("audit_log")
+      .select("id, group_id, actor_id, action, target, created_at")
+      .eq("group_id", req.params.id)
+      .order("created_at", { ascending: false })
+      .limit(100);
+
+    if (error) throw error;
+    res.json({ entries: entries || [] });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/:id/bans", validate({ params: idParamSchema }), async (req, res, next) => {
+  try {
+    await requireMember(req.params.id, req.student.id, "admin");
+    const supabase = getClient();
+
+    const { data: rows, error } = await supabase
+      .from("study_group_bans")
+      .select("id, group_id, student_id, banned_by, reason, created_at")
+      .eq("group_id", req.params.id)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    if (!rows || rows.length === 0) {
+      return res.json({ bans: [] });
+    }
+
+    const studentIds = rows.map((r) => r.student_id);
+    const { data: students, error: studentError } = await supabase
+      .from("students")
+      .select("id, name, branch, year")
+      .in("id", studentIds);
+
+    if (studentError) throw studentError;
+
+    const byId = new Map((students || []).map((s) => [s.id, s]));
+    const bans = rows.map((r) => {
+      const s = byId.get(r.student_id);
+      return {
+        ...r,
+        student: s
+          ? { id: s.id, name: s.name, branch: s.branch, year: s.year }
+          : null,
+      };
+    });
+
+    res.json({ bans });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete(
+  "/:id/bans/:sid",
+  validate({ params: memberParamSchema }),
+  async (req, res, next) => {
+    try {
+      await requireMember(req.params.id, req.student.id, "admin");
+      const supabase = getClient();
+
+      const { data, error } = await supabase
+        .from("study_group_bans")
+        .delete()
+        .eq("group_id", req.params.id)
+        .eq("student_id", req.params.sid)
+        .select("id, group_id, student_id");
+
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        return res.status(404).json({ message: "Ban not found" });
+      }
+
+      await logAudit(req.params.id, req.student.id, "member_unban", req.params.sid);
+      res.json({ message: "Member unbanned" });
     } catch (error) {
       next(error);
     }

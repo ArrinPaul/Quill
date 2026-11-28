@@ -500,8 +500,12 @@ function createFakeSupabase(initialData = {}) {
         const { p_group, p_student } = params;
         const groups = getTable("study_groups");
         const members = getTable("study_group_members");
+        const bans = getTable("study_group_bans");
         if (!groups.some((g) => g.id === p_group)) {
           return Promise.resolve({ data: "not_found", error: null });
+        }
+        if (bans.some((b) => b.group_id === p_group && b.student_id === p_student)) {
+          return Promise.resolve({ data: "banned", error: null });
         }
         if (members.some((m) => m.group_id === p_group && m.student_id === p_student)) {
           return Promise.resolve({ data: "already_member", error: null });
@@ -538,6 +542,10 @@ function createFakeSupabase(initialData = {}) {
         }
         if (!groups.some((g) => g.id === invite.group_id)) {
           return Promise.resolve({ data: { status: "not_found", group_id: null }, error: null });
+        }
+        const bans = getTable("study_group_bans");
+        if (bans.some((b) => b.group_id === invite.group_id && b.student_id === p_student)) {
+          return Promise.resolve({ data: { status: "banned", group_id: invite.group_id }, error: null });
         }
         if (members.some((m) => m.group_id === invite.group_id && m.student_id === p_student)) {
           return Promise.resolve({ data: { status: "already_member", group_id: invite.group_id }, error: null });
