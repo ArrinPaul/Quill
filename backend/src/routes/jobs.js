@@ -93,13 +93,15 @@ router.post("/digest", async (req, res, next) => {
       .eq("email_digest", true);
     if (error) throw error;
 
-    const waiting = (students || [])
-      .filter((s) => !s.last_digest_at || now - new Date(s.last_digest_at) >= DIGEST_GAP_MS)
-      .slice(0, BATCH);
+    const waiting = (students || []).filter(
+      (s) => !s.last_digest_at || now - new Date(s.last_digest_at) >= DIGEST_GAP_MS
+    );
 
     let sent = 0;
     let failed = 0;
     for (const student of waiting) {
+      // Count emails, not people looked at: those with nothing due must not use up the batch.
+      if (sent + failed >= BATCH) break;
       const { data: tasks, error: taskError } = await supabase
         .from("tasks")
         .select("title, deadline")
