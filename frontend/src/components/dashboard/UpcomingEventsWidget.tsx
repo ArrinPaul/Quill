@@ -44,32 +44,20 @@ export function UpcomingEventsWidget() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([
-      api.get<{ tasks: Task[] }>("/api/tasks/upcoming").catch(() => ({ tasks: [] })),
-      api.get<{ events: any[] }>("/api/groups/events").catch(() => ({ events: [] }))
-    ])
-      .then(([tasksRes, groupEventsRes]) => {
-        const taskItems: CombinedEvent[] = (tasksRes.tasks || []).map((t) => ({
-          id: t.id,
-          title: t.title,
-          date: t.deadline,
-          subtitle: t.subject,
-          type: "task"
-        }));
+    api
+      .get<{ tasks: Task[] }>("/api/tasks/upcoming")
+      .then((tasksRes) => {
+        const taskItems: CombinedEvent[] = (tasksRes.tasks || [])
+          .map((t) => ({
+            id: t.id,
+            title: t.title,
+            date: t.deadline,
+            subtitle: t.subject,
+            type: "task" as const,
+          }))
+          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-        const announcementItems: CombinedEvent[] = (groupEventsRes.events || []).map((e) => ({
-          id: e.id,
-          title: e.title,
-          date: e.event_date,
-          subtitle: e.telegram_groups?.name || "Group Announcement",
-          type: "announcement"
-        }));
-
-        const combined = [...taskItems, ...announcementItems].sort(
-          (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-        );
-
-        setEvents(combined.slice(0, 5));
+        setEvents(taskItems.slice(0, 5));
       })
       .catch(() => setEvents([]))
       .finally(() => setLoading(false));
