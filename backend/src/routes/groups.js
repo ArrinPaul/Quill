@@ -13,6 +13,8 @@ const {
   updateMemberRoleSchema,
   transferOwnershipSchema,
 } = require("../schemas/groups");
+const { inviteParamSchema, createInviteSchema } = require("../schemas/invites");
+const { generateInviteCode, hashInviteCode } = require("./invites");
 
 const router = express.Router();
 router.use(authMiddleware);
@@ -420,5 +422,87 @@ router.post("/:id/transfer", validate({ params: idParamSchema, body: transferOwn
     next(error);
   }
 });
+
+const INVITE_PUBLIC_FIELDS =
+  "id, group_id, created_by, expires_at, max_uses, uses, revoked_at, created_at";
+
+router.post(
+  "/:id/invites",
+  validate({ params: idParamSchema, body: createInviteSchema }),
+  async (req, res, next) => {
+    try {
+      await requireMember(req.params.id, req.student.id, "admin");
+      const supabase = getClient();
+
+      const code = generateInviteCode();
+      const codeHash = hashInviteCode(code);
+      const expiresAt = new Date(
+        Date.now() + req.body.expiresInDays * 24 * 60 * 60 * 1000
+      ).toISOString();
+
+      const { data: invite, error } = await supabase
+        .from("study_group_invites")
+        .insert({
+          group_id: req.params.id,
+          code_hash: codeHash,
+          created_by: req.student.id,
+          expires_at: expiresAt,
+          max_uses: req.body.maxUses,
+        })
+        .select(INVITE_PUBLIC_FIELDS)
+        .single();
+
+      if (error) throw error;
+      res.status(201).json({ invite, code });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.get("/:id/invites", validate({ params: idParamSchema }), async (req, res, next) => {
+  try {
+    await requireMember(req.params.id, req.student.id, "admin");
+    const supabase = getClient();
+
+    const { data: invites, error } = await supabase
+      .from("study_group_invites")
+      .select(INVITE_PUBLIC_FIELDS)
+      .eq("group_id", req.params.id)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    res.json({ invites: invites || [] });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete(
+  "/:id/invites/:inviteId",
+  validate({ params: inviteParamSchema }),
+  async (req, res, next) => {
+    try {
+      await requireMember(req.params.id, req.student.id, "admin");
+      const supabase = getClient();
+
+      const { data: invite, error } = await supabase
+        .from("study_group_invites")
+        .update({ revoked_at: new Date().toISOString() })
+        .eq("id", req.params.inviteId)
+        .eq("group_id", req.params.id)
+        .select(INVITE_PUBLIC_FIELDS)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!invite) {
+        return res.status(404).json({ message: "Invite not found" });
+      }
+      res.json({ invite });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 module.exports = router;

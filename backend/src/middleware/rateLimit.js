@@ -84,8 +84,16 @@ const publicLimiter = createLimiter({
   limit: 60,
 });
 
+// 10 attempts per 15 minutes per user or IP for /api/invites/*
+const inviteLimiter = createLimiter({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  keyGenerator: userOrIpKey,
+});
+
 module.exports = {
   publicLimiter,
+  inviteLimiter,
   authIpLimiter,
   loginEmailLimiter,
   aiLimiter,

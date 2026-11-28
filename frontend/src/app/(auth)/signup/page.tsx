@@ -1,17 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { ArrowLeft, ArrowRight, Check, Eye, EyeOff } from "@untitledui/icons";
 import { PasswordStrengthMeter } from "@/features/auth/components/PasswordStrengthMeter";
+import { getSafeRedirect } from "@/features/groups/safeRedirect";
 import { api } from "@/lib/api";
 
 const branches = ["CSE", "IT", "ECE", "EEE", "ME", "CE", "Other"];
 const years = [1, 2, 3, 4];
 
-export default function SignupPage() {
+function SignupForm() {
   const { register } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const safeRedirect = getSafeRedirect(searchParams.get("redirect"));
   
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
@@ -69,7 +74,8 @@ export default function SignupPage() {
           password: form.password,
           branch: form.branch,
           year: Number(form.year),
-        }, true);
+        }, false);
+        router.push(safeRedirect);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Registration failed");
       } finally {
@@ -257,11 +263,32 @@ export default function SignupPage() {
       {step === 1 && (
         <p className="mt-4 text-center text-xs text-muted-foreground">
           Already have an account?{" "}
-          <Link href="/login" className="font-medium text-primary hover:underline">
+          <Link
+            href={
+              safeRedirect !== "/dashboard"
+                ? `/login?redirect=${encodeURIComponent(safeRedirect)}`
+                : "/login"
+            }
+            className="font-medium text-primary hover:underline"
+          >
             Sign in
           </Link>
         </p>
       )}
     </div>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="bg-card rounded-[10px] border border-border p-5 sm:p-6 shadow-sm w-full text-sm text-muted-foreground">
+          Loading...
+        </div>
+      }
+    >
+      <SignupForm />
+    </Suspense>
   );
 }

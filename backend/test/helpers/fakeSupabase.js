@@ -68,6 +68,11 @@ function createFakeSupabase(initialData = {}) {
       if (record.role === undefined) record.role = "member";
       if (record.joined_at === undefined) record.joined_at = now;
     }
+    if (tableName === "study_group_invites") {
+      if (record.uses === undefined) record.uses = 0;
+      if (record.revoked_at === undefined) record.revoked_at = null;
+      if (record.max_uses === undefined) record.max_uses = 25;
+    }
     return record;
   }
 
@@ -252,6 +257,19 @@ function createFakeSupabase(initialData = {}) {
                 data: null,
                 error: {
                   message: 'duplicate key value violates unique constraint "idx_study_group_one_owner"',
+                  code: "23505",
+                },
+              };
+            }
+          }
+        }
+        if (tableName === "study_group_invites") {
+          for (const rec of built) {
+            if (table.some((r) => r.code_hash === rec.code_hash)) {
+              return {
+                data: null,
+                error: {
+                  message: 'duplicate key value violates unique constraint "idx_study_group_invites_code_hash"',
                   code: "23505",
                 },
               };
@@ -500,6 +518,43 @@ function createFakeSupabase(initialData = {}) {
           joined_at: new Date().toISOString(),
         });
         return Promise.resolve({ data: "joined", error: null });
+      }
+      if (fnName === "accept_study_group_invite") {
+        const { p_code_hash, p_student } = params;
+        const invites = getTable("study_group_invites");
+        const groups = getTable("study_groups");
+        const members = getTable("study_group_members");
+
+        const invite = invites.find((i) => i.code_hash === p_code_hash);
+        if (!invite) {
+          return Promise.resolve({ data: { status: "not_found", group_id: null }, error: null });
+        }
+        if (
+          (invite.revoked_at !== null && invite.revoked_at !== undefined) ||
+          new Date(invite.expires_at).getTime() <= Date.now() ||
+          (invite.max_uses !== null && invite.max_uses !== undefined && invite.uses >= invite.max_uses)
+        ) {
+          return Promise.resolve({ data: { status: "not_found", group_id: null }, error: null });
+        }
+        if (!groups.some((g) => g.id === invite.group_id)) {
+          return Promise.resolve({ data: { status: "not_found", group_id: null }, error: null });
+        }
+        if (members.some((m) => m.group_id === invite.group_id && m.student_id === p_student)) {
+          return Promise.resolve({ data: { status: "already_member", group_id: invite.group_id }, error: null });
+        }
+        const count = members.filter((m) => m.group_id === invite.group_id).length;
+        if (count >= 75) {
+          return Promise.resolve({ data: { status: "full", group_id: invite.group_id }, error: null });
+        }
+        members.push({
+          id: crypto.randomUUID(),
+          group_id: invite.group_id,
+          student_id: p_student,
+          role: "member",
+          joined_at: new Date().toISOString(),
+        });
+        invite.uses = (invite.uses || 0) + 1;
+        return Promise.resolve({ data: { status: "joined", group_id: invite.group_id }, error: null });
       }
       throw new Error(`Unsupported Supabase client method: rpc(${fnName})`);
     },
