@@ -5,6 +5,8 @@ import { toast } from 'sonner';
 import { useEffect, useState } from "react";
 import { AlertTriangle, Calendar, Check, Copy01 as Copy, Key01 as Key, Loading01 as Loader2, Plus, RefreshCcw01 as RefreshCw, Save01 as Save, Settings01 as Settings, User01 as User, XClose as X } from "@untitledui/icons";
 import { API_BASE, api } from "@/lib/api";
+import { EmailVerificationCard } from "@/features/auth/components/EmailVerificationCard";
+import { PasswordStrengthMeter } from "@/features/auth/components/PasswordStrengthMeter";
 import { EmailSettingsCard } from "@/features/settings/EmailSettingsCard";
 import { useAuth } from "@/hooks/useAuth";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
@@ -180,9 +182,9 @@ export default function SettingsPage() {
       toast.error("Please enter your current and new password");
       return;
     }
-    if (newPassword.length < 6) {
-      setError("New password must be at least 6 characters");
-      toast.error("New password must be at least 6 characters");
+    if (newPassword.length < 8) {
+      setError("New password must be at least 8 characters");
+      toast.error("New password must be at least 8 characters");
       return;
     }
     if (newPassword !== confirmNewPassword) {
@@ -397,6 +399,12 @@ export default function SettingsPage() {
             </form>
           </div>
 
+          {/* Email Verification Card */}
+          <EmailVerificationCard
+            email={user?.email || ""}
+            initialVerified={Boolean((user as { email_verified?: boolean } | null)?.email_verified)}
+          />
+
           {/* Change Password Card */}
           <div className="bg-card border border-border rounded-[10px] p-6 shadow-sm space-y-4">
             <h3 className="font-semibold text-foreground text-base flex items-center gap-2 border-b border-border pb-3">
@@ -431,9 +439,10 @@ export default function SettingsPage() {
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     className="w-full px-3 py-2 border border-border rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                    placeholder="At least 6 characters"
+                    placeholder="At least 8 characters"
                     required
                   />
+                  <PasswordStrengthMeter password={newPassword} />
                 </div>
                 <div>
                   <label htmlFor="confirm-new-password-settings" className="block text-xs font-semibold text-foreground mb-1.5 uppercase tracking-wider">

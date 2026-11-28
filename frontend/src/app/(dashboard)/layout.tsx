@@ -8,6 +8,7 @@ import { CommandPalette } from "@/components/shared/CommandPalette";
 import { Sidebar } from "@/components/shared/Sidebar";
 import { MobileFooter } from "@/components/shared/MobileFooter";
 import { MobileNav } from "@/components/shared/MobileNav";
+import { VerificationBanner } from "@/features/auth/components/VerificationBanner";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -53,7 +54,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       <div className="flex-1 flex flex-col min-h-screen min-w-0">
         <main className={`flex-1 overflow-auto ${!isDesktop ? "pb-16" : ""}`}>
-          <div className={isWhiteboard ? "p-4" : "p-4 sm:p-6"}><Suspense>{children}</Suspense></div>
+          <div className={isWhiteboard ? "p-4" : "p-4 sm:p-6"}>
+            <VerificationBanner />
+            <Suspense>{children}</Suspense>
+          </div>
         </main>
 
         {!isDesktop && <MobileFooter onMenuClick={openMobile} />}

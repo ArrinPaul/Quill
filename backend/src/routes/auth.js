@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
@@ -13,10 +14,21 @@ const {
   changePasswordSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
+  verifyEmailSchema,
 } = require("../schemas/auth");
-const { isEmailConfigured, sendPasswordReset } = require("../services/email");
+const { isEmailConfigured, sendPasswordReset, sendVerificationCode } = require("../services/email");
 
 const router = express.Router();
+
+const STUDENT_PUBLIC_FIELDS = "id, name, email, branch, year, subjects, email_verified_at, created_at";
+
+function serializeStudent(student) {
+  const { password_hash, ...rest } = student;
+  return {
+    ...rest,
+    email_verified: Boolean(student.email_verified_at),
+  };
+}
 
 function signSessionToken(student, tokenVersion = student.token_version ?? 0) {
   return jwt.sign(
@@ -74,14 +86,14 @@ router.post("/register", authIpLimiter, validate({ body: registerSchema }), asyn
         year,
         subjects,
       })
-      .select("id, name, email, branch, year, subjects, created_at")
+      .select(STUDENT_PUBLIC_FIELDS)
       .single();
 
     if (error) throw error;
 
     const token = signSessionToken(student);
 
-    res.json({ token, student });
+    res.json({ token, student: serializeStudent(student) });
   } catch (error) {
     next(error);
   }
@@ -108,8 +120,7 @@ router.post("/login", authIpLimiter, loginEmailLimiter, validate({ body: loginSc
 
     const token = signSessionToken(student);
 
-    const { password_hash, ...studentData } = student;
-    res.json({ token, student: studentData });
+    res.json({ token, student: serializeStudent(student) });
   } catch (error) {
     next(error);
   }
@@ -118,12 +129,12 @@ router.post("/login", authIpLimiter, loginEmailLimiter, validate({ body: loginSc
 router.get("/me", authMiddleware, async (req, res, next) => {
   try {
     if (req.student.id === "00000000-0000-0000-0000-000000000000") {
-      return res.json({ student: req.student });
+      return res.json({ student: { ...req.student, email_verified: true } });
     }
 
     const { data: student, error } = await getClient()
       .from("students")
-      .select("id, name, email, branch, year, subjects, created_at")
+      .select(STUDENT_PUBLIC_FIELDS)
       .eq("id", req.student.id)
       .single();
 
@@ -131,7 +142,7 @@ router.get("/me", authMiddleware, async (req, res, next) => {
       return res.status(404).json({ message: "Student not found" });
     }
 
-    res.json({ student });
+    res.json({ student: serializeStudent(student) });
   } catch (error) {
     next(error);
   }
@@ -145,11 +156,11 @@ router.put("/me", authMiddleware, validate({ body: updateProfileSchema }), async
       .from("students")
       .update({ name, branch, year, subjects })
       .eq("id", req.student.id)
-      .select("id, name, email, branch, year, subjects, created_at")
+      .select(STUDENT_PUBLIC_FIELDS)
       .single();
 
     if (error) throw error;
-    res.json({ student });
+    res.json({ student: serializeStudent(student) });
   } catch (error) {
     next(error);
   }
@@ -299,6 +310,156 @@ router.delete("/me", authMiddleware, async (req, res, next) => {
     }
 
     res.json({ message: "Account deleted successfully" });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/verify/send", authMiddleware, async (req, res, next) => {
+  try {
+    const emailConfigured = isEmailConfigured();
+    const showDevCode = !emailConfigured && process.env.DEV_MODE === "true" && process.env.NODE_ENV !== "production";
+    if (!emailConfigured && !showDevCode) {
+      return res.status(503).json({ message: "Verification email is not set up on this server." });
+    }
+
+    const supabase = getClient();
+    const { data: student, error: studentError } = await supabase
+      .from("students")
+      .select("id, email, email_verified_at")
+      .eq("id", req.student.id)
+      .maybeSingle();
+
+    if (studentError) throw studentError;
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+    if (student.email_verified_at) {
+      return res.status(400).json({ message: "Email is already verified" });
+    }
+
+    const now = Date.now();
+    const nowIso = new Date(now).toISOString();
+    const expiredPrevIso = new Date(now - 1000).toISOString();
+    const oneMinuteAgoIso = new Date(now - 60 * 1000).toISOString();
+    const oneDayAgoIso = new Date(now - 24 * 60 * 60 * 1000).toISOString();
+
+    const { data: recentCodes, error: recentError } = await supabase
+      .from("email_codes")
+      .select("id, created_at")
+      .eq("student_id", student.id)
+      .gte("created_at", oneDayAgoIso);
+
+    if (recentError) throw recentError;
+
+    if ((recentCodes || []).length >= 5) {
+      return res.status(429).json({ message: "Daily verification limit reached. Try again tomorrow." });
+    }
+    if ((recentCodes || []).some((c) => c.created_at >= oneMinuteAgoIso)) {
+      return res.status(429).json({ message: "Please wait a minute before requesting another code." });
+    }
+
+    const code = String(crypto.randomInt(0, 1000000)).padStart(6, "0");
+    const codeHash = crypto.createHash("sha256").update(code).digest("hex");
+
+    // Keep only one active code per student without deleting today's rate-limit history
+    const { error: expireError } = await supabase
+      .from("email_codes")
+      .update({ expires_at: expiredPrevIso })
+      .eq("student_id", student.id)
+      .gte("expires_at", nowIso);
+
+    if (expireError) throw expireError;
+
+    const { data: insertedCode, error: insertError } = await supabase
+      .from("email_codes")
+      .insert({
+        student_id: student.id,
+        code_hash: codeHash,
+        expires_at: new Date(now + 10 * 60 * 1000).toISOString(),
+        attempts: 0,
+      })
+      .select("id")
+      .single();
+
+    if (insertError) throw insertError;
+
+    if (showDevCode) {
+      return res.json({ message: "Verification code generated.", devCode: code });
+    }
+
+    try {
+      await sendVerificationCode(student.email, code);
+    } catch (err) {
+      await supabase.from("email_codes").delete().eq("id", insertedCode.id);
+      console.error("Verification email failed:", err.message);
+      return res.status(503).json({ message: "Could not send verification email. Please try again." });
+    }
+
+    res.json({ message: "Verification code sent to your email." });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/verify", authMiddleware, validate({ body: verifyEmailSchema }), async (req, res, next) => {
+  try {
+    const { code } = req.body;
+    const supabase = getClient();
+    const nowIso = new Date().toISOString();
+
+    const { data: codes, error: codeError } = await supabase
+      .from("email_codes")
+      .select("id, code_hash, expires_at, attempts")
+      .eq("student_id", req.student.id)
+      .gte("expires_at", nowIso)
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (codeError) throw codeError;
+
+    const activeCode = codes && codes[0];
+    if (!activeCode) {
+      return res.status(400).json({ message: "Verification code is invalid or has expired." });
+    }
+    if ((activeCode.attempts ?? 0) >= 5) {
+      return res.status(400).json({ message: "Too many incorrect attempts. Please request a new code." });
+    }
+
+    const submittedHash = crypto.createHash("sha256").update(code).digest("hex");
+    const a = Buffer.from(submittedHash, "hex");
+    const b = Buffer.from(activeCode.code_hash, "hex");
+    const matches = a.length === b.length && crypto.timingSafeEqual(a, b);
+
+    if (!matches) {
+      const nextAttempts = (activeCode.attempts ?? 0) + 1;
+      const { error: attemptError } = await supabase
+        .from("email_codes")
+        .update({ attempts: nextAttempts })
+        .eq("id", activeCode.id);
+      if (attemptError) throw attemptError;
+
+      return res.status(400).json({
+        message:
+          nextAttempts >= 5
+            ? "Too many incorrect attempts. Please request a new code."
+            : "Incorrect verification code.",
+      });
+    }
+
+    const { error: verifyError } = await supabase
+      .from("students")
+      .update({ email_verified_at: nowIso })
+      .eq("id", req.student.id);
+    if (verifyError) throw verifyError;
+
+    const { error: deleteError } = await supabase
+      .from("email_codes")
+      .delete()
+      .eq("id", activeCode.id);
+    if (deleteError) throw deleteError;
+
+    res.json({ message: "Email verified successfully.", email_verified: true });
   } catch (error) {
     next(error);
   }

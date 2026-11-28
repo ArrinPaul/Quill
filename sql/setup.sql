@@ -14,6 +14,7 @@ CREATE TABLE public.students (
   password_hash TEXT NOT NULL,
   token_version INTEGER NOT NULL DEFAULT 0,
   feed_version INTEGER NOT NULL DEFAULT 0,
+  email_verified_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -320,3 +321,18 @@ CREATE INDEX IF NOT EXISTS idx_share_links_owner ON public.share_links(owner_id,
 ALTER TABLE public.focus_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.share_links ENABLE ROW LEVEL SECURITY;
 GRANT ALL ON public.focus_sessions, public.share_links TO service_role;
+
+-- ===== C2: Email verification =====
+
+CREATE TABLE IF NOT EXISTS public.email_codes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id UUID NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
+  code_hash TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_email_codes_student_id ON public.email_codes(student_id, created_at DESC);
+
+ALTER TABLE public.email_codes ENABLE ROW LEVEL SECURITY;
+GRANT ALL ON public.email_codes TO service_role;

@@ -25,4 +25,11 @@ const sendPasswordReset = (to, resetUrl) =>
     `Use this link to choose a new password. It expires in 15 minutes.\n\n${resetUrl}\n\nIf you didn't ask for this, you can ignore this email.`
   );
 
-module.exports = { isEmailConfigured, sendEmail, sendPasswordReset };
+const sendVerificationCode = (to, code) =>
+  sendEmail(
+    to,
+    "Verify your Quill email",
+    `Your Quill verification code is: ${code}\n\nIt expires in 10 minutes. If you didn't request this, you can ignore this email.`
+  );
+
+module.exports = { isEmailConfigured, sendEmail, sendPasswordReset, sendVerificationCode };

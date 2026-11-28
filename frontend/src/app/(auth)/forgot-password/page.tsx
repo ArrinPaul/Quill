@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeft, CheckCircle, Eye, EyeOff } from "@untitledui/icons";
+import { PasswordStrengthMeter } from "@/features/auth/components/PasswordStrengthMeter";
 import { api } from "@/lib/api";
 
 function ForgotPasswordContent() {
@@ -52,8 +53,8 @@ function ForgotPasswordContent() {
     setError("");
     setSuccessMsg("");
 
-    if (newPassword.length < 6) {
-      setError("Password must be at least 6 characters");
+    if (newPassword.length < 8) {
+      setError("Password must be at least 8 characters");
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -165,7 +166,7 @@ function ForgotPasswordContent() {
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 className="w-full px-3 py-2 pr-10 border border-border rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                placeholder="At least 6 characters"
+                placeholder="At least 8 characters"
                 required
               />
               <button
@@ -177,6 +178,7 @@ function ForgotPasswordContent() {
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
+            <PasswordStrengthMeter password={newPassword} />
           </div>
 
           <div>
