@@ -383,6 +383,20 @@ CREATE INDEX IF NOT EXISTS idx_ai_conversations_student_updated
 CREATE INDEX IF NOT EXISTS idx_ai_messages_conversation_created
   ON public.ai_messages(conversation_id, created_at ASC);
 
+-- ===== Notes (P3) =====
+CREATE TABLE IF NOT EXISTS public.notes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id UUID NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
+  title TEXT NOT NULL DEFAULT 'Untitled',
+  content TEXT NOT NULL DEFAULT '',
+  version INTEGER NOT NULL DEFAULT 1,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_notes_student_updated
+  ON public.notes(student_id, updated_at DESC);
+
 -- ===== Access control =====
 -- RLS on every table blocks the public anon key; the backend's service_role key bypasses RLS.
 DO $$

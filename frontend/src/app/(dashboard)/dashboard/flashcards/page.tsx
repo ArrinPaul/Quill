@@ -111,6 +111,26 @@ export default function FlashcardsPage() {
     fetchDecks();
   }, []);
 
+  // Prefill new deck modal when opened from Notes
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const raw = sessionStorage.getItem("Quill_prefill_flashcards");
+    if (!raw) return;
+    sessionStorage.removeItem("Quill_prefill_flashcards");
+    try {
+      const parsed = JSON.parse(raw) as { title?: string; content?: string };
+      queueMicrotask(() => {
+        if (parsed.title) setModalTitle(parsed.title);
+        if (parsed.content) setModalContent(parsed.content);
+        setModalTab("text");
+        setUploadError("");
+        setIsDeckModalOpen(true);
+      });
+    } catch {
+      // ignore malformed prefill
+    }
+  }, []);
+
   // Persist current study position per deck
   useEffect(() => {
     if (typeof window === "undefined" || !selectedDeckId) return;

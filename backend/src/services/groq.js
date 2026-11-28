@@ -4,6 +4,7 @@ const {
   getQuizOutputSchema,
   gradeShortAnswerOutputSchema,
 } = require("../schemas/ai");
+const { noteTasksOutputSchema } = require("../schemas/notes");
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 
@@ -587,6 +588,63 @@ Do NOT wrap the JSON in Markdown backticks (e.g., \`\`\`json). Return raw JSON.`
   }
 }
 
+async function runNoteAi(action, title, content) {
+  const noteTitle = title || "Untitled";
+  const noteBody = truncate(content || "");
+
+  if (action === "summarize") {
+    const text = await complete({
+      messages: [
+        {
+          role: "system",
+          content:
+            "Summarize the student's Markdown note into clear, concise bullet points and key takeaways in Markdown. Do not invent facts outside the note.",
+        },
+        { role: "user", content: `Title: ${noteTitle}\n\n${noteBody}` },
+      ],
+      temperature: 0.3,
+      max_tokens: 900,
+    });
+    return { action, result: text.trim() };
+  }
+
+  if (action === "expand") {
+    const text = await complete({
+      messages: [
+        {
+          role: "system",
+          content:
+            "Expand the student's Markdown note into well-structured, detailed study notes in Markdown with clear headings, examples, and explanations while preserving the original points.",
+        },
+        { role: "user", content: `Title: ${noteTitle}\n\n${noteBody}` },
+      ],
+      temperature: 0.5,
+      max_tokens: 1500,
+    });
+    return { action, result: text.trim() };
+  }
+
+  const today = new Date().toISOString().split("T")[0];
+  const text = await complete({
+    messages: [
+      {
+        role: "system",
+        content: `Extract actionable study or assignment tasks from the student's note.
+Return ONLY a JSON array of 1 to 10 objects with:
+- "title": concise task title (max 150 chars)
+- "subject": relevant subject or "General"
+- "dueDate": "YYYY-MM-DD" (today is ${today}; infer a reasonable near-term date if none is mentioned)
+Do not include markdown backticks or any text outside the JSON array.`,
+      },
+      { role: "user", content: `Title: ${noteTitle}\n\n${noteBody}` },
+    ],
+    temperature: 0.3,
+    max_tokens: 1000,
+  });
+  const tasks = parseAndValidateJson(text, noteTasksOutputSchema);
+  return { action, result: tasks };
+}
+
 module.exports = {
   AIError,
   setGroqClient,
@@ -604,6 +662,7 @@ module.exports = {
   generateQuiz,
   gradeShortAnswer,
   executeSmartTool,
-  extractGroupEvent
+  extractGroupEvent,
+  runNoteAi,
 };
 

@@ -13,6 +13,7 @@ const calendarRoutes = require("./routes/calendar");
 const flashcardsRoutes = require("./routes/flashcards");
 const achievementsRoutes = require("./routes/achievements");
 const activityRoutes = require("./routes/activity");
+const notesRoutes = require("./routes/notes");
 
 const { generalLimiter } = require("./middleware/rateLimit");
 
@@ -39,6 +40,7 @@ app.use("/api/calendar", calendarRoutes);
 app.use("/api/flashcards", flashcardsRoutes);
 app.use("/api/achievements", achievementsRoutes);
 app.use("/api/activity", activityRoutes);
+app.use("/api/notes", notesRoutes);
 
 const errorHandler = require("./middleware/errors");
 

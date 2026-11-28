@@ -97,6 +97,26 @@ export default function QuizPage() {
     fetchQuizzes();
   }, [fetchQuizzes]);
 
+  // Prefill new quiz modal when opened from Notes
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const raw = sessionStorage.getItem("Quill_prefill_quiz");
+    if (!raw) return;
+    sessionStorage.removeItem("Quill_prefill_quiz");
+    try {
+      const parsed = JSON.parse(raw) as { title?: string; content?: string };
+      queueMicrotask(() => {
+        if (parsed.title) setNewQuizTitle(parsed.title);
+        if (parsed.content) setNewQuizContent(parsed.content);
+        setModalTab("text");
+        setUploadError("");
+        setIsNewQuizModalOpen(true);
+      });
+    } catch {
+      // ignore malformed prefill
+    }
+  }, []);
+
   useEffect(() => {
     if (!selectedQuizId) {
       setQuiz(null);

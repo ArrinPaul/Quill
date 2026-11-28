@@ -111,3 +111,24 @@ export interface AiMessage {
   content: string;
   created_at: string;
 }
+
+export interface NoteSummary {
+  id: string;
+  title: string;
+  version: number;
+  updated_at: string;
+  created_at: string;
+}
+
+export interface Note extends NoteSummary {
+  student_id: string;
+  content: string;
+}
+
+export type NoteAiAction = "summarize" | "expand" | "tasks";
+
+export interface NoteSuggestedTask {
+  title: string;
+  subject?: string;
+  dueDate?: string;
+}
