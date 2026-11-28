@@ -1,5 +1,6 @@
 "use client";
 
+import { ShareButton } from "@/features/share/ShareButton";
 import { useQueryAction } from "@/hooks/useQueryAction";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -420,6 +421,8 @@ export function NotesWorkspace() {
                       </button>
                     )}
                   </span>
+
+                  <ShareButton type="note" id={activeNoteId} />
 
                   <button
                     type="button"

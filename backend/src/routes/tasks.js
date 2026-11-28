@@ -134,6 +134,18 @@ router.put("/:id", validate({ params: idParamSchema, body: updateTaskSchema }), 
     }
     if (reminder_time !== undefined) {
       updatePayload.reminder_time = reminder_time;
+      const { data: before, error: beforeError } = await getClient()
+        .from("tasks")
+        .select("reminder_time")
+        .eq("id", req.params.id)
+        .eq("student_id", req.student.id)
+        .maybeSingle();
+      if (beforeError) throw beforeError;
+      // The edit form always sends the time, so compare instead of resetting on every save.
+      const millis = (v) => (v ? new Date(v).getTime() : null);
+      if (before && millis(before.reminder_time) !== millis(reminder_time)) {
+        updatePayload.reminder_sent_at = null;
+      }
     }
 
     const { data: task, error } = await getClient()

@@ -108,6 +108,12 @@ router.post("/focus", validate({ body: focusSchema }), async (req, res, next) =>
 
     if (upsertError) throw upsertError;
 
+    // History for the reports page; losing one entry must not fail the timer.
+    const { error: historyError } = await supabase
+      .from("focus_sessions")
+      .insert({ student_id: studentId, minutes });
+    if (historyError) console.error("Failed to record focus session:", historyError.message);
+
     res.json({ total_focus_minutes: settings.total_focus_minutes });
   } catch (error) {
     next(error);

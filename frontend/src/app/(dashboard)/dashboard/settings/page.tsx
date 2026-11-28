@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { useEffect, useState } from "react";
 import { AlertTriangle, Calendar, Check, Copy01 as Copy, Key01 as Key, Loading01 as Loader2, Plus, RefreshCcw01 as RefreshCw, Save01 as Save, Settings01 as Settings, User01 as User, XClose as X } from "@untitledui/icons";
 import { API_BASE, api } from "@/lib/api";
+import { EmailSettingsCard } from "@/features/settings/EmailSettingsCard";
 import { useAuth } from "@/hooks/useAuth";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 
@@ -468,6 +469,8 @@ export default function SettingsPage() {
               </div>
             </form>
           </div>
+
+          <EmailSettingsCard />
 
           {/* Calendar Feed Card */}
           <div className="bg-card border border-border rounded-[10px] p-6 shadow-sm space-y-4">

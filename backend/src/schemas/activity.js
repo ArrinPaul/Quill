@@ -1,7 +1,7 @@
 const { z } = require("./common");
 
 const focusSchema = z.object({
-  minutes: z.number().finite().positive().max(1440),
+  minutes: z.number().int().min(1).max(180),
 });
 
 const recentQuerySchema = z.object({

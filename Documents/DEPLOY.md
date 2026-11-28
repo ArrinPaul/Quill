@@ -82,6 +82,7 @@ Deploy in this order so each service has the URLs and keys it needs:
 | `GROQ_API_KEY` | Yes | Groq API key for AI study tools & assistant |
 | `RESEND_API_KEY` | Yes (for email) | Resend API key for password reset emails |
 | `EMAIL_FROM` | Yes (for email) | Verified sender address, e.g. `Quill <noreply@yourdomain.com>` |
+| `CRON_SECRET` | For scheduled email | Long random string; also add it as the GitHub secret `CRON_SECRET`, and set the repository variable `BACKEND_URL` to the Render address |
 | `FRONTEND_URL` | Yes | Exact Vercel origin(s), comma-separated, no trailing slash |
 | `NODE_ENV` | Yes | `production` (already set in `render.yaml`) |
 | `PORT` | Managed | `10000` (already set in `render.yaml`) |

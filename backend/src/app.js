@@ -15,6 +15,10 @@ const achievementsRoutes = require("./routes/achievements");
 const activityRoutes = require("./routes/activity");
 const notesRoutes = require("./routes/notes");
 const searchRoutes = require("./routes/search");
+const jobRoutes = require("./routes/jobs");
+const reportRoutes = require("./routes/reports");
+const shareRoutes = require("./routes/share");
+const emailRoutes = require("./routes/email");
 
 const { generalLimiter } = require("./middleware/rateLimit");
 
@@ -44,6 +48,12 @@ app.use("/api/achievements", achievementsRoutes);
 app.use("/api/activity", activityRoutes);
 app.use("/api/notes", notesRoutes);
 app.use("/api/search", searchRoutes);
+app.use("/api/jobs", jobRoutes);
+app.use("/api/reports", reportRoutes);
+app.use("/api/share-links", shareRoutes.links);
+app.use("/api/public", shareRoutes.publicShare);
+app.use("/api/email-preferences", emailRoutes.preferences);
+app.use("/api/unsubscribe", emailRoutes.unsubscribe);
 
 const errorHandler = require("./middleware/errors");
 
